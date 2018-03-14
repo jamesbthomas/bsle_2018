@@ -2,9 +2,13 @@
 
 This directory houses the header files, source files, and test harness.
 
-## <FILE 1>
+## /src/headers
 
-This entry is a placeholder for the first header/source file
+This directory houses the header files for the project.
+
+## /src/sources
+
+This directory houses the source files for the project.
 
 ## /src/testharness
 
