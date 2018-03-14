@@ -2,7 +2,12 @@
 import sys, unittest, os
 sys.path.append('../../bin')
 # Add the path to C2 to python's path so we can import it here, path addition is volatile
-from C2 import patternValidate,fileValidate
+try:
+	from C2 import patternValidate,fileValidate,addrValidate
+except ImportError:
+	print("ERROR: Can only be run from projectroot/src/testharness/")
+	# TODO See if there is a way around this
+	sys.exit(1)
 
 class DefaultTestCase(unittest.TestCase):
 
@@ -87,6 +92,19 @@ class FileValidateTestCase(DefaultTestCase):
 		# Malformed Path
 		self.assertEqual(fileValidate(".../."),None)
 		self.assertEqual(fileValidate("$/.."),None)
+
+class addrValidateTestCase(DefaultTestCase):
+
+	def runTest(self):
+		# Good socket
+		self.assertTrue(addrValidate("127.0.0.1"))
+		self.assertTrue(addrValidate("8.8.8.8"))
+		self.assertTrue(addrValidate("10.73.195.4"))
+		# Invalid IP
+		self.assertFalse(addrValidate("256.256.256.256"))
+		self.assertFalse(addrValidate("0.0.0.0"))
+		self.assertFalse(addrValidate("a.b.c.d"))
+		self.assertFalse(addrValidate("0.0.0.-1"))
 
 if __name__ == "__main__":
 	print("Beginning unit tests...")

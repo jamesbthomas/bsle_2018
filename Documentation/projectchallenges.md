@@ -10,4 +10,3 @@ This document details the challenges I encountered, and any design issues and/or
 ## Security Flaws
 ### 1) C2 -> FTS is vulnerable to man-in-the-middle
 Because everything between the C2 and FTS is sent unencrypted, including the encryption pattern and validation message, any variation on the classic man-in-the-middle attack poses a massive security flaw.
-

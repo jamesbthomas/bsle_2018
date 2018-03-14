@@ -9,6 +9,7 @@ def main(opts,args):
 	path = None
 	pattern = None
 	phrase = None
+	addr = None
 
 	# Check to see if options were provided on the command line
 	if (len(opts) < 1):
@@ -29,13 +30,22 @@ def main(opts,args):
 			except KeyboardInterrupt:
 				print("\nBye!")
 				sys.exit(0)
-			if not patternValidate(pattern):
+			if patternValidate(pattern):
 				break
 		try:
 			phrase = input("Passphrase: ").strip()
 		except KeyboardInterrupt:
 			print("\nBye!")
 			sys.exit(0)
+		while True:
+			try:
+				addr = input("Destination Socket: ").strip()
+			except KeyboardInterrupt:
+				print("\nBye!")
+				sys.exit(0)
+			if not addrValidate(addr):
+				break
+
 	else:
 		# Initialize variables based on contents in opts and args
 		for switch,val in opts:
@@ -50,6 +60,10 @@ def main(opts,args):
 				file = fileValidate(path)
 				if not file:
 					sys.exit(1)
+			elif switch == "-d" or switch == "--destination":
+				addr = val.strip()
+				if not addrValidate(addr):
+					sys.exit(1)
 
 		# If user didnt provide file through a switch, check args
 		if not path:
@@ -62,8 +76,13 @@ def main(opts,args):
 				print("Error parsing command line options: "+str(err))
 				sys.exit(1)
 
+	print(file.name)
+	print(pattern)
+	print(phrase)
+	print(addr)
+
 	# TODO IPAddWhiteList
-		## Managed from the command line maybe? But how do we ensure the FSS is valid?
+		## Managed from the command line, user provides input, if the FTS returns a valid initialization message it checks IPAddWhitelist and adds if it doesnt exist
 
 	# TODO UDP Connection to FTS w/ initialization message, encryption pattern, destination port, destination address
 		## Wait to receive unencrypted validation message
@@ -80,7 +99,7 @@ def main(opts,args):
 
 # Usage function to print switches and input
 def usage():
-	print("Usage: python3 C2.py [-h] (-e |--encode=) '<encoding pattern>' (-p |--passphrase=) <passphrase> [-f |--file=] <file>")
+	print("Usage: python3 C2.py [-h] -e '<encoding pattern>' -p <passphrase> -d <ip> [-f] <file>")
 	return 0
 
 # Help function called by --help and -h
@@ -94,6 +113,7 @@ def help():
 	print("\t\t\t\t Each option contains two parts - an operation and a number of bytes to perform the operation on")
 	print("\t\t\t\t There are four options available - Bitwise XOR (^), Bitwise NOT (~), Rotate Right (ror), and Rotate Left (rol)")
 	print("\t -p <phrase>\t same as --passphrase, specifies the passphrase to be used to initialize the file transfer session")
+	print("\t -d <ip> /t same as --destination, specifies the IP Address of the FSS server to send to")
 	print("\t -f <filepath>\t optional, same as --file, specifies which file you want to transfer")
 	print("\t -h\t\t same as --help, displays this menu")
 	# TODO add a -v verbose option
@@ -123,10 +143,33 @@ def patternValidate(pattern):
 			return 0
 	return 1
 
+# Function to validate that a provided IP address is valid
+## Return Value 0 - IP address is not valid
+## Return Value 1 - IP address is valid
+def addrValidate(addr):
+	# Check IP Address
+	try:
+		# Counter to keep track of which octet we're checking
+		i = 0
+		for oct in re.match('([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})',addr).groups():
+			if (i == 0):
+				# A valid first octet can be between 1 and 255
+				assert(int(oct) <= 255)
+				assert(int(oct) > 0)
+			else:
+				# Other octets are valid between 0 and 255
+				assert(int(oct) <= 255)
+				assert(int(oct) >= 0)
+			i += 1
+	except Exception:
+		print("Error: Invalid IP Address")
+		return 0
+	return 1
+
 if __name__ == "__main__":
 	# Check for command line args and pass to main
 	try:
-		opts,args = getopt.getopt(sys.argv[1:],"he:p:f:",["help","encode=","passphrase=","file="])
+		opts,args = getopt.getopt(sys.argv[1:],"he:p:f:d:",["help","encode=","passphrase=","file=","destination=="])
 	except getopt.GetoptError as err:
 		print(err)
 		usage()
