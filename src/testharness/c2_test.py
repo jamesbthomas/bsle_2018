@@ -107,6 +107,11 @@ class addrValidateTestCase(DefaultTestCase):
 		self.assertFalse(addrValidate("0.0.0.0"))
 		self.assertFalse(addrValidate("255.255.255.255"))
 
+class craftRequestTestCase(DefaultTestCase):
+
+	def runTest(self):
+		
+
 if __name__ == "__main__":
 	print("Beginning unit tests...")
 	unittest.main()
