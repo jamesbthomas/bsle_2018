@@ -1,7 +1,7 @@
 # /src/testharness
 
-This directory houses the test files of the project. Each file will represent the tests for a single function and the entries below provide a short description of each test.
+This directory houses the test files of the project.
 
-## <TEST FILE 1>
+## c2_test.py
 
-This is a placeholder for the first test file
+This file contains the unit tests for all functions in C2.py located in projectroot/bin.

@@ -1,6 +1,6 @@
 # /src/sources
 
-This directory houses the source files for the project and any header files located in /src/headers. Each source file's entry will include a brief description of the file's purpose and any required citations.
+This directory houses the source files for the project and all header files stored in /src/headers. Each file's entry will include a brief description and any required citations.
 
 ## fss.c
 
