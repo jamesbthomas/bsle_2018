@@ -2,13 +2,13 @@
 
 This directory houses the header files, source files, and test harness.
 
-## fss.c
+## /src/headers
 
-This file is the main function and overall structure and control for the File Server Storage module.
+This directory houses the header files.
 
-## fts.c
+## /src/sources
 
-This file contains the main function and overall structure and control for the File Transfer Service module.
+This directory houses the source files.
 
 ## /src/testharness
 
