@@ -2,6 +2,6 @@
 
 This directory houses the test files of the project.
 
-## /src/testharness/ctwo
+## c2_test.py
 
-This directory houses the test files for the C2 program.
+This file contains the unit tests for all functions in C2.py located in projectroot/bin.

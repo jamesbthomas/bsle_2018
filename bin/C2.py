@@ -62,9 +62,13 @@ def main(opts,args):
 				print("Error parsing command line options: "+str(err))
 				sys.exit(1)
 
+	# TODO IPAddWhiteList
+		## Managed from the command line maybe? But how do we ensure the FSS is valid?
+
 	# TODO UDP Connection to FTS w/ initialization message, encryption pattern, destination port, destination address
 		## Wait to receive unencrypted validation message
 		## Timeout
+		## IP Whitelist of valid FSS
 
 	# TODO Data Transfer
 		## TCP Three-way Handshake
@@ -110,6 +114,9 @@ def fileValidate(path):
 ## Return Value 1 - encode pattern is valid
 def patternValidate(pattern):
 	options = pattern.split(";")
+	if (len(options) < 2):
+		print("Error: Insufficient Encoding Options")
+		return 0
 	for set in options:
 		if not re.match('(~|\^\d+|ror\d+|rol\d+):\d+',set):
 			print("Error: Invalid Encoding Pattern")
