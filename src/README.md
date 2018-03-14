@@ -2,9 +2,9 @@
 
 This directory houses the header files, source files, and test harness.
 
-## <FILE 1>
+## fts.c
 
-This entry is a placeholder for the first header/source file
+This file contains the main function and overall structure and control for the File Transfer Service module.
 
 ## /src/testharness
 
