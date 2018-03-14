@@ -1,4 +1,4 @@
-# Python3 Source File for the PacketCrafter class used to craft packets for the custom communication protocol
+# Python3 Source File for the PacketCrafter class used to craft packets for the custom communication protocol and supporting functions
 from scapy.all import *
 
 class PacketCrafter:
@@ -26,6 +26,24 @@ class PacketCrafter:
 		pkt.tcpPort = port
 		pkt.validation = message
 
+	def convertAddr(self,addr):
+		# Convert an IP address from a string to a number that can be put into the packet
+		decimal = 0
+		numOct = 0
+		# Split the address into octets and reverse it in place (minimizes memory)
+		octets = addr.split(".")
+		octets.reverse()
+		for octet in octets:
+			num = int(octet)
+			for i in (7,6,5,4,3,2,1,0):
+				val = 2**i
+				if val <= num:
+					num -= val
+					decimal += 2**(i+(numOct*8))
+				print(num,val,2**(i+(numOct*8)))
+			numOct += 1
+		return decimal
+
 class Request(Packet):
 	name = "FTRequest"
 	fields_desc = [ByteField("packetType",0),
@@ -49,6 +67,4 @@ class Response(Packet):
 # Used for dev testing
 if __name__ == "__main__":
 	pc = PacketCrafter()
-	r = pc.craftRequest(127,100,"xyz","gh")
-	r.show()
-	hexdump(r)
+	print(pc.convertAddr("127.0.0.1"))

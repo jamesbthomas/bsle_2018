@@ -1,9 +1,11 @@
-# Unit tests for C2 patternValidate function using the unittest module
+# Unit tests for C2 program using the unittest module
 import sys, unittest, os
 sys.path.append('../../bin')
+sys.path.append('../headers')
 # Add the path to C2 to python's path so we can import it here, path addition is volatile
 try:
 	from C2 import patternValidate,fileValidate,addrValidate
+	from packetCrafter import *
 except ImportError:
 	print("ERROR: Can only be run from projectroot/src/testharness/")
 	# TODO See if there is a way around this
@@ -16,6 +18,7 @@ class DefaultTestCase(unittest.TestCase):
 		## Sets stdout to the null device
 		self.stdout = open(os.devnull,'w')
 		sys.stdout = self.stdout
+		self.pc = PacketCrafter()
 
 	def tearDown(self):
 		# Reset stdout
@@ -93,7 +96,7 @@ class FileValidateTestCase(DefaultTestCase):
 		self.assertEqual(fileValidate(".../."),None)
 		self.assertEqual(fileValidate("$/.."),None)
 
-class addrValidateTestCase(DefaultTestCase):
+class AddrValidateTestCase(DefaultTestCase):
 
 	def runTest(self):
 		# Valid IP
@@ -107,11 +110,20 @@ class addrValidateTestCase(DefaultTestCase):
 		self.assertFalse(addrValidate("0.0.0.0"))
 		self.assertFalse(addrValidate("255.255.255.255"))
 
-class craftRequestTestCase(DefaultTestCase):
+class ConvertAddrTestCase(DefaultTestCase):
 
 	def runTest(self):
-		
+		self.assertEqual(self.pc.convertAddr("127.0.0.1"),2130706433)
+		self.assertEqual(self.pc.convertAddr("0.0.0.0"),0)
+		self.assertEqual(self.pc.convertAddr("255.255.255.255"),4294967295)
+
+class CraftRequestTestCase(DefaultTestCase):
+
+	def runTest(self):
+		firstTest = self.pc.craftRequest("127.0.0.1",1111,"~2:40;rol1:120","firstTest")
+		self.assertEqual(firstTest.name,"FTRequest")
+		self.assertEqual(firstTest.fssAddress,"127.0.0.1")
 
 if __name__ == "__main__":
-	print("Beginning unit tests...")
+	print("working")
 	unittest.main()
