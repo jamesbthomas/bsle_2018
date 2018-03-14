@@ -96,15 +96,16 @@ class FileValidateTestCase(DefaultTestCase):
 class addrValidateTestCase(DefaultTestCase):
 
 	def runTest(self):
-		# Good socket
+		# Valid IP
 		self.assertTrue(addrValidate("127.0.0.1"))
 		self.assertTrue(addrValidate("8.8.8.8"))
 		self.assertTrue(addrValidate("10.73.195.4"))
 		# Invalid IP
 		self.assertFalse(addrValidate("256.256.256.256"))
-		self.assertFalse(addrValidate("0.0.0.0"))
 		self.assertFalse(addrValidate("a.b.c.d"))
 		self.assertFalse(addrValidate("0.0.0.-1"))
+		self.assertFalse(addrValidate("0.0.0.0"))
+		self.assertFalse(addrValidate("255.255.255.255"))
 
 if __name__ == "__main__":
 	print("Beginning unit tests...")

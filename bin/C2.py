@@ -149,18 +149,12 @@ def patternValidate(pattern):
 def addrValidate(addr):
 	# Check IP Address
 	try:
-		# Counter to keep track of which octet we're checking
-		i = 0
 		for oct in re.match('([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})',addr).groups():
-			if (i == 0):
-				# A valid first octet can be between 1 and 255
-				assert(int(oct) <= 255)
-				assert(int(oct) > 0)
-			else:
-				# Other octets are valid between 0 and 255
-				assert(int(oct) <= 255)
-				assert(int(oct) >= 0)
-			i += 1
+			assert(int(oct) <= 255)
+			assert(int(oct) >= 0)
+		if addr == "0.0.0.0" or addr == "255.255.255.255":
+			# Check for any and broadcast, no reason to use these
+			raise Exception
 	except Exception:
 		print("Error: Invalid IP Address")
 		return 0
