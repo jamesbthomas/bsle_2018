@@ -2,9 +2,9 @@
 
 This directory houses the header files, source files, and test harness.
 
-## <FILE 1>
+## fss.c
 
-This entry is a placeholder for the first header/source file
+This file is the main function and overall structure and control for the File Server Storage module.
 
 ## /src/testharness
 
