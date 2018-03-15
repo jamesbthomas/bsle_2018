@@ -7,6 +7,7 @@ sys.path.append('../headers')
 try:
 	from C2 import patternValidate,fileValidate,addrValidate
 	from packetCrafter import *
+	from encoder import *
 except ImportError:
 	print("ERROR: Can only be run from projectroot/src/testharness/")
 	# TODO See if there is a way around this
@@ -20,6 +21,7 @@ class DefaultTestCase(unittest.TestCase):
 		self.stdout = open(os.devnull,'w')
 		sys.stdout = self.stdout
 		self.pc = PacketCrafter()
+		self.enc = Encoder("^2:40;rol1:120")
 
 	def tearDown(self):
 		# Reset stdout
@@ -126,11 +128,23 @@ class ConvertPatternTestCase(DefaultTestCase):
 		self.assertEqual(unpack("BBBB",self.pc.convertPattern("ror8:80;^16:160")),(136,80,16,160))
 		self.assertEqual(unpack("BBBB",self.pc.convertPattern("~:63;^63:255")),(64,63,63,255))
 
+class EncoderTestCase(DefaultTestCase):
+
+	def runTest(self):
+		first = Encoder("~:20;ror3:40")
+		self.assertEqual(first.pattern,"~:20;ror3:40")
+		self.assertEqual(first.ops,["~","r3"])
+		self.assertEqual(first.lens,["20","40"])
+		self.assertRaises(ValueError,Encoder,"~2:20;ror3:40")
+		self.assertRaises(ValueError,Encoder,"~:20;ror340")
+		self.assertRaises(ValueError,Encoder,"~:20ror3:40")
+
 class CraftRequestTestCase(DefaultTestCase):
 
 	def runTest(self):
 		firstTest = self.pc.craftRequest("127.0.0.1","1111","~:40;rol1:120","firstTest")
 		self.assertEqual(firstTest.name,"FTRequest")
+		self.assertEqual(firstTest.packetType,0)
 		self.assertEqual(firstTest.fssAddress,self.pc.convertAddr("127.0.0.1"))
 		self.assertEqual(firstTest.fssPort,1111)
 		self.assertEqual(firstTest.patternLength,len("~:40;rol1:120"))
@@ -146,6 +160,20 @@ class CraftRequestTestCase(DefaultTestCase):
 		self.assertEqual(fifthTest,None)
 		sixthTest = self.pc.craftRequest("127.0.0.1","1111","~:40;rol1120","sixthTest")
 		self.assertEqual(sixthTest,None)
+
+class CraftInitTestCase(DefaultTestCase):
+
+	def runTest(self):
+		return True
+#		firstTest = self.pc.craftInit("encodedMessage")
+#		self.assertEqual(firstTest.name,"FTInit")
+#		self.assertEqual(firstTest.packetType,1)
+#		self.assertEqual(firstTest.encMessage,self.enc.encode("encodedMessage"))
+
+class CraftResponseTestCase(DefaultTestCase):
+
+	def runTest(self):
+		return True
 
 if __name__ == "__main__":
 	unittest.main()

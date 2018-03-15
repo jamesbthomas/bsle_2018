@@ -10,6 +10,7 @@ class PacketCrafter:
 	def craftRequest(self,addr,port,pattern,phrase):
 		# Craft Packet Type 0x00
 		pkt = Request()
+		pkt.packetType = 0
 		pkt.fssAddress = self.convertAddr(addr)
 		if int(port) > 65535 or int(port) < 1:
 			print("Error: Invalid port number")
@@ -28,12 +29,14 @@ class PacketCrafter:
 		# Craft Packet Type 0x01
 		pkt = Init()
 		pkt.encMessage = message
+		return pkt
 
 	def craftResponse(self,port,message):
 		# Craft Packet Type 0x02 and 0x03
 		pkt = Response()
 		pkt.tcpPort = port
 		pkt.validation = message
+		return pkt
 
 	def convertAddr(self,addr):
 		# Convert an IP address from a string to a number that can be put into the packet
@@ -100,7 +103,7 @@ class Init(Packet):
 
 class Response(Packet):
 	name = "FTResponse"
-	fields_desc = [ByteField("packetType",2),
+	fields_desc = [ByteField("packetType",4),
 			ShortField("tcpPort",0),
 			StrLenField("validation","") ]
 
