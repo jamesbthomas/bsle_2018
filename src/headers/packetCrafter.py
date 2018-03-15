@@ -55,7 +55,6 @@ class PacketCrafter:
 				if val <= num:
 					num -= val
 					decimal += 2**(i+(numOct*8))
-				print(num,val,2**(i+(numOct*8)))
 			numOct += 1
 		return decimal
 
@@ -63,7 +62,6 @@ class PacketCrafter:
 		# Convert encoding pattern from a string into a 4byte value
 		# Split into options, each option gets 2 bytes
 		opts = pattern.split(";")
-		print(opts)
 		if len(opts) != 2:
 			print("Error: Invalid Encoding Pattern")
 			return None
@@ -87,7 +85,18 @@ class PacketCrafter:
 				packed += pack("BB",int(opLen[0][1:]),int(opLen[1]))
 		return packed
 
+	def craftResponse(self,port,message):
+		# Takes the encrypted validation message and crafts the response packet
+		pkt = Response()
+		if port < 1 or port > 65535:
+			print("Error: Invalid Port Number")
+			return None
+		pkt.tcpPort = port
+		pkt.validation = message
+		return pkt
+
 class Request(Packet):
+	# Packet Type 0x00 - C2 -> FTS
 	name = "FTRequest"
 	fields_desc = [ByteField("packetType",0),
 			IntField("fssAddress",0),
@@ -96,19 +105,13 @@ class Request(Packet):
 			StrFixedLenField("pattern","",length_from=lambda x:4),
 			StrLenField("message","") ]
 
-class Init(Packet):
-	name = "FTInit"
-	fields_desc = [ByteField("packetType",1),
-			StrLenField("encMessage","") ]
-
 class Response(Packet):
+	# Packet Type 0x02 - FSS -> FTS
 	name = "FTResponse"
-	fields_desc = [ByteField("packetType",4),
+	fields_desc = [ByteField("packetType",2),
 			ShortField("tcpPort",0),
 			StrLenField("validation","") ]
 
 # Used for dev testing
 if __name__ == "__main__":
 	pc = PacketCrafter()
-	out = pc.convertPattern("~:40rol1:120")
-	print(unpack("BBBB",out))

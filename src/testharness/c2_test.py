@@ -142,7 +142,46 @@ class EncoderTestCase(DefaultTestCase):
 class EncodeTestCase(DefaultTestCase):
 
 	def runTest(self):
-		return True
+		encs = (Encoder("~:2;^1:2"),Encoder("ror1:2;rol1:2"))
+		# Only first option runs
+		self.assertEqual(encs[0].encode("m"),bytes([146]))
+		self.assertEqual(encs[1].encode("m"),bytes([182]))
+		# Both options run
+		self.assertEqual(encs[0].encode("mess"),b'\x92\x9a\x72\x72')
+		self.assertEqual(encs[1].encode("mess"),b'\xb6\xb2\xe6\xe6')
+		# First runs twice, second runs once
+		self.assertEqual(encs[0].encode("messa"),b'\x92\x9a\x72\x72\x9e')
+		self.assertEqual(encs[1].encode("messa"),b'\xb6\xb2\xe6\xe6\xb0')
+		# Both run twice or more
+		self.assertEqual(encs[0].encode("messages"),b'\x92\x9a\x72\x72\x9e\x98\x64\x72')
+		self.assertEqual(encs[1].encode("messages"),b'\xb6\xb2\xe6\xe6\xb0\xb3\xca\xe6')
+		# TODO check exception cases
+
+class DecodeTestCase(DefaultTestCase):
+
+	def runTest(self):
+		encs = (Encoder("~:2;^1:2"),Encoder("ror1:2;rol1:2"))
+		# Only first option
+		m0 = encs[0].encode("m")
+		m1 = encs[1].encode("m")
+		self.assertEqual(encs[0].decode(m0),"m")
+		self.assertEqual(encs[1].decode(m1),"m")
+		# Both options
+		mess0 = encs[0].encode("mess")
+		mess1 = encs[1].encode("mess")
+		self.assertEqual(encs[0].decode(mess0),"mess")
+		self.assertEqual(encs[1].decode(mess1),"mess")
+		# First runs twice, second runs once
+		messag0 = encs[0].encode("messag")
+		messag1 = encs[1].encode("messag")
+		self.assertEqual(encs[0].decode(messag0),"messag")
+		self.assertEqual(encs[1].decode(messag1),"messag")
+		# Reality test
+		first = encs[0].encode("first message")
+		second = encs[1].encode("second message")
+		self.assertEqual(encs[0].decode(first),"first message")
+		self.assertEqual(encs[1].decode(second),"second message")
+		# TODO check exception cases
 
 class CraftRequestTestCase(DefaultTestCase):
 
@@ -166,19 +205,16 @@ class CraftRequestTestCase(DefaultTestCase):
 		sixthTest = self.pc.craftRequest("127.0.0.1","1111","~:40;rol1120","sixthTest")
 		self.assertEqual(sixthTest,None)
 
-class CraftInitTestCase(DefaultTestCase):
-
-	def runTest(self):
-		return True
-#		firstTest = self.pc.craftInit("encodedMessage")
-#		self.assertEqual(firstTest.name,"FTInit")
-#		self.assertEqual(firstTest.packetType,1)
-#		self.assertEqual(firstTest.encMessage,self.enc.encode("encodedMessage"))
-
 class CraftResponseTestCase(DefaultTestCase):
 
 	def runTest(self):
-		return True
+		first = self.pc.craftResponse(1337,"validation message")
+		self.assertEqual(first.tcpPort,1337)
+		self.assertEqual(first.validation,b"validation message")
+		second = self.pc.craftResponse(0,b"low port")
+		self.assertEqual(second,None)
+		third = self.pc.craftResponse(65536,b"high port")
+		self.assertEqual(third,None)
 
 if __name__ == "__main__":
 	unittest.main()

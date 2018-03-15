@@ -48,30 +48,80 @@ class Encoder:
 							self.enc += bytes([255 ^ self.plainBytes[index]])
 						elif self.ops[i][0] == "r":
 							# Conduct bitwise Right Shift
-							print(bytes([self.plainBytes[index] >> int(self.ops[i][1:])]))
-							# TODO write right bit shift that takes bits off the end and puts them into the MSB
+							byte = '0'+bin(self.plainBytes[index])[2:] # trim the 0b off the front and add an eighth bit to round out the byte
+							rollVal = (int(self.ops[i][1:])%8) * -1
+							self.enc += bytes([int("".join(byte[rollVal:]+byte[:rollVal]),2)])
 						elif self.ops[i][0] == "l":
 							# Conduct bitwise Left Shift
-							# TODO write left bit shift that takes bits off the end and puts them into the MSB
+							byte = '0'+bin(self.plainBytes[index])[2:]
+							rollVal = int(self.ops[i][1:])%8
+							self.enc += bytes([int("".join(byte[rollVal:]+byte[:rollVal]),2)])
 						elif self.ops[i][0] == "^":
 							# Conduct bitwise XOR
-							# TODO
+							byte = int('0'+bin(self.plainBytes[index])[2:],2)
+							xorVal = int(self.ops[i][1:])%8
+							self.enc += bytes([byte ^ xorVal])
+						else:
+							print("Error: Internal Error - Unknown Operator") # TODO raise exception
+							return None
 						index += 1
 						numOps += 1
 			except IndexError:
 				break
-		print(self.enc)
-		return None
+		return self.enc
 
-	def shiftRight(self,binary):
-		# TODO
-		return None
-
-	def shiftLeft(self,binary):
-		# TODO
-		return None
+	def decode(self,encrypted):
+		# Takes a byte string and decrypts it into plaintext
+		self.enc = encrypted
+		self.plainBytes = b''
+		index = 0
+		while (index < len(self.enc)):
+			try:
+				for i in (0,1):
+					numOps = 0
+					while (numOps < int(self.lens[i])):
+						if self.ops[i] == "~":
+							# Encrypt with NOT, decrypt with NOT
+							self.plainBytes += bytes([255 ^ self.enc[index]])
+						elif self.ops[i][0] == "r":
+							# Encrypt with rotate right, decrypt with rotate left
+							byte = bin(self.enc[index])[2:]
+							if (len(byte) < 8):
+								byte = '0'+byte
+							elif (len(byte) > 8):
+								print("Error: Internal Error - Binary Translation Error") # TODO raise exception
+								return None
+							rollVal = int(self.ops[i][1:])%8
+							self.plainBytes += bytes([int("".join(byte[rollVal:]+byte[:rollVal]),2)])
+						elif self.ops[i][0] == "l":
+							# Encrypt with rotate left, decrypt with rotate right
+							byte = bin(self.enc[index])[2:]
+							if (len(byte) < 8):
+								byte = '0'+byte
+							elif (len(byte) > 8):
+								print("Error: Internal Error - Binary Translation Error") # TODO raise exception
+								return None
+							rollVal = (int(self.ops[i][1:])%8) * -1
+							self.plainBytes += bytes([int("".join(byte[rollVal:]+byte[:rollVal]),2)])
+						elif self.ops[i][0] == "^":
+							# Encrypt with XOR, decrypt with XOR
+							byte = int('0'+bin(self.enc[index])[2:],2)
+							xorVal = int(self.ops[i][1:])%8
+							self.plainBytes += bytes([byte ^ xorVal])
+						else:
+							print("Error: Internal Error - Unknown Operator") # TODO raise exception
+							return None
+						index += 1
+						numOps += 1
+			except IndexError:
+				break
+		self.plain = self.plainBytes.decode()
+		return self.plain
 
 # Used for dev testing
 if __name__ == "__main__":
-	enc = Encoder("~:40;rol1:120")
-	enc.encode("message")
+	enc = Encoder("ror1:40;rol1:120")
+	encoded = enc.encode("m")
+	print("encoded - ",encoded)
+	decoded = enc.decode(encoded)
+	print("decoded - ",decoded)

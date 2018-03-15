@@ -1,15 +1,27 @@
 # Source file for C2 Program written in Python3
+# TODO check permissions, make sure this is being run as superuser
 import getopt, sys, os, re
+from scapy.all import *
+sys.path.append("../src/headers")
+try:
+	from packetCrafter import *
+except ImportError:
+	print("Error: must be run from projectroot/bin")
+	sys.exit(1)
 
 # Main function
 def main(opts,args):
 	print("Starting FTS C2 program...")
 
+	# TODO FTS IP address
+	ftsAddr = "10.0.0.15"
+	# TODO FTS IP Address
+
 	file = None
 	path = None
 	pattern = None
 	phrase = None
-	addr = None
+	socket = None
 
 	# Check to see if options were provided on the command line
 	if (len(opts) < 1):
@@ -39,11 +51,11 @@ def main(opts,args):
 			sys.exit(0)
 		while True:
 			try:
-				addr = input("Destination Socket: ").strip()
+				socket = input("Destination Socket: ").strip()
 			except KeyboardInterrupt:
 				print("\nBye!")
 				sys.exit(0)
-			if not addrValidate(addr):
+			if socketValidate(socket):
 				break
 
 	else:
@@ -61,8 +73,8 @@ def main(opts,args):
 				if not file:
 					sys.exit(1)
 			elif switch == "-d" or switch == "--destination":
-				addr = val.strip()
-				if not addrValidate(addr):
+				socket = val.strip()
+				if not socketValidate(socket):
 					sys.exit(1)
 
 		# If user didnt provide file through a switch, check args
@@ -76,18 +88,20 @@ def main(opts,args):
 				print("Error parsing command line options: "+str(err))
 				sys.exit(1)
 
-	print(file.name)
-	print(pattern)
-	print(phrase)
-	print(addr)
+	parts = socket.split(":")
+	addr = parts[0]
+	port = parts[1]
 
 	# TODO IPAddWhiteList
 		## Managed from the command line, user provides input, if the FTS returns a valid initialization message it checks IPAddWhitelist and adds if it doesnt exist
 
-	# TODO UDP Connection to FTS w/ initialization message, encryption pattern, destination port, destination address
-		## Wait to receive unencrypted validation message
+	# TODO Wait to receive unencrypted validation message
 		## Timeout
 		## IP Whitelist of valid FSS
+	crafter = PacketCrafter()
+	requestPacket = crafter.craftRequest(addr,port,pattern,phrase)
+	pkt = IP(dst=ftsAddr,src="10.0.0.15") / UDP(sport=65535,dport=1337) / requestPacket
+	send(pkt)
 
 	# TODO Data Transfer
 		## TCP Three-way Handshake
@@ -99,7 +113,7 @@ def main(opts,args):
 
 # Usage function to print switches and input
 def usage():
-	print("Usage: python3 C2.py [-h] -e '<encoding pattern>' -p <passphrase> -d <ip> [-f] <file>")
+	print("Usage: python3 C2.py [-h] -e '<encoding pattern>' -p <passphrase> -d <ip>:<port> [-f] <file>")
 	return 0
 
 # Help function called by --help and -h
@@ -113,7 +127,7 @@ def help():
 	print("\t\t\t\t Each option contains two parts - an operation and a number of bytes to perform the operation on")
 	print("\t\t\t\t There are four options available - Bitwise XOR (^), Bitwise NOT (~), Rotate Right (ror), and Rotate Left (rol)")
 	print("\t -p <phrase>\t same as --passphrase, specifies the passphrase to be used to initialize the file transfer session")
-	print("\t -d <ip> /t same as --destination, specifies the IP Address of the FSS server to send to")
+	print("\t -d <ip>:<port> /t same as --destination, specifies the IP Address and port of the FSS server to send to")
 	print("\t -f <filepath>\t optional, same as --file, specifies which file you want to transfer")
 	print("\t -h\t\t same as --help, displays this menu")
 	# TODO add a -v verbose option
@@ -143,20 +157,28 @@ def patternValidate(pattern):
 			return 0
 	return 1
 
-# Function to validate that a provided IP address is valid
-## Return Value 0 - IP address is not valid
-## Return Value 1 - IP address is valid
-def addrValidate(addr):
+# Function to validate that a provided socket is valid
+## Return Value 0 - Socket is not valid
+## Return Value 1 - Socket is valid
+def socketValidate(socket):
+	parts = socket.split(":")
+	if (len(parts) != 2):
+		print("Error: Invalid Socket Format")
+		return 0
 	# Check IP Address
 	try:
-		for oct in re.match('([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})',addr).groups():
+		for oct in re.match('([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})',parts[0]).groups():
 			assert(int(oct) <= 255)
 			assert(int(oct) >= 0)
-		if addr == "0.0.0.0" or addr == "255.255.255.255":
+		if parts[0] == "0.0.0.0" or parts[0] == "255.255.255.255":
 			# Check for any and broadcast, no reason to use these
 			raise Exception
 	except Exception:
 		print("Error: Invalid IP Address")
+		return 0
+	# Check Port Number
+	if (int(parts[1]) > 65535 or int(parts[1]) < 1):
+		print("Error: Invalid Port Number")
 		return 0
 	return 1
 
