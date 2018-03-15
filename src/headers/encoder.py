@@ -34,10 +34,44 @@ class Encoder:
 	def encode(self,message):
 		# Takes a plaintext message and encodes it using the pattern specified at initialization
 		self.plain = message
-		print(self.ops,self.lens,self.pattern,self.plain)
+		# Transpose to a byte string
+		self.plainBytes = message.encode()
+		self.enc = b''
+		index = 0
+		while(index < len(self.plainBytes)):
+			try:
+				for i in (0,1):
+					numOps = 0
+					while (numOps < int(self.lens[i])):
+						if self.ops[i] == "~":
+							# Conduct bitwise NOT, aka XOR with all 1s
+							self.enc += bytes([255 ^ self.plainBytes[index]])
+						elif self.ops[i][0] == "r":
+							# Conduct bitwise Right Shift
+							print(bytes([self.plainBytes[index] >> int(self.ops[i][1:])]))
+							# TODO write right bit shift that takes bits off the end and puts them into the MSB
+						elif self.ops[i][0] == "l":
+							# Conduct bitwise Left Shift
+							# TODO write left bit shift that takes bits off the end and puts them into the MSB
+						elif self.ops[i][0] == "^":
+							# Conduct bitwise XOR
+							# TODO
+						index += 1
+						numOps += 1
+			except IndexError:
+				break
+		print(self.enc)
+		return None
+
+	def shiftRight(self,binary):
+		# TODO
+		return None
+
+	def shiftLeft(self,binary):
+		# TODO
+		return None
 
 # Used for dev testing
 if __name__ == "__main__":
-	enc = Encoder("~2:40;rol1:120")
-	print(enc)
-#	enc.encode("test message")
+	enc = Encoder("~:40;rol1:120")
+	enc.encode("message")

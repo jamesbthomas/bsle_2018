@@ -139,6 +139,11 @@ class EncoderTestCase(DefaultTestCase):
 		self.assertRaises(ValueError,Encoder,"~:20;ror340")
 		self.assertRaises(ValueError,Encoder,"~:20ror3:40")
 
+class EncodeTestCase(DefaultTestCase):
+
+	def runTest(self):
+		return True
+
 class CraftRequestTestCase(DefaultTestCase):
 
 	def runTest(self):
