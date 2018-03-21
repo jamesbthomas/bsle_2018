@@ -34,7 +34,7 @@ class PacketCrafter:
 		if (int(pkt.load[0]) != 1):
 			print("Error: Invalid Packet Type")
 			return None
-		return pkt.load[1:]
+		return pkt.load[1:],pkt[IP].src,pkt[UDP].sport
 
 	def convertAddr(self,addr):
 		# Convert an IP address from a string to a number that can be put into the packet

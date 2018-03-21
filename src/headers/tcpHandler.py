@@ -19,6 +19,7 @@ class TCPHandler():
 	def handshake(self,verbose):
 		# Conducts the TCP three-way handshake with the destination and port provided at init
 		## Returns True if handshake is successful, False otherwise
+		## Used by the C2 to initiate data transfer to the FTS
 		syn = IP(dst=self.dst) / TCP(dport=self.dport,flags="S",seq=self.seq)
 		synAck = None
 		fails = 0 # keep track of how many times we've failed so this doesn't loop forever
@@ -43,17 +44,53 @@ class TCPHandler():
 		if verbose:
 			print("SYNACK Received!")
 		# Craft ACK and send
-		self.lastSeq = synAck.seq
-		ack = IP(dst=self.dst) / TCP(dport=self.dport,flags="A",ack=synAck.seq+1,seq=synAck.ack)
+		self.lastSeq = synAck[TCP].seq
+		ack = IP(dst=self.dst) / TCP(dport=self.dport,flags="A",ack=synAck[TCP].seq+1,seq=synAck[TCP].ack)
 		send(ack)
 		if verbose:
 			print("ACK Sent - Connection Established")
 		return True
 
+	def shake(self,port):
+		# Accepts TCP three-way handshake
+		## Returns True if handshake successful, False otherwise
+		## USed by the FSS to tell the FTS to initiat encoded transfer
+		fails = 0
+		self.state = "LISTEN"
+		syn = None
+		while fails < 3:
+			syn = sniff(filter="tcp dst port "+str(port)+" and ip src host "+self.dst,count=1)[0]
+			if not syn:
+				if syn[TCP].flags != 2:
+					syn = None
+				fails += 1
+			else:
+				self.state = "SYN_RCVD"
+				self.dport = syn[TCP].sport
+
+		if fails >= 3:
+			print("Error: Bad SYN")
+			return False
+		fails = 0
+		synAck = send(IP(dst=self.dst) / TCP(dport=self.dport,flags="SA",ack=syn[TCP].seq+1,seq=self.seq)
+		while fails < 3:
+			ack = sniff(filter="tcp dst port "+str(port)+" and ip src host "+self.dst,count=1)[0]
+			if not ack:
+				if ack[TCP].flags != 16:
+					ack = None
+				fails += 1
+			else:
+				self.state = "ESTABLISHED"
+				break
+		if fails >= 3:
+			print("Error: Bad ACK")
+			return False
+		return True
+
 	def close(self,verbose):
 		# Close the connection
 		## Returns True if close successful, False otherwise
-		fin = IP(dst=self.dst)) / TCP(dport=self.dport,flags="F")
+		fin = IP(dst=self.dst) / TCP(dport=self.dport,flags="F")
 		fails = 0
 		finAck = None
 		self.state = "FIN_WAIT_1"
@@ -116,6 +153,7 @@ class TCPHandler():
 			print("Error: File not found")
 			return -1
 		sent = 0
+		# TODO send a packet that contains the file name so we know what to use on the FSS
 		while sent < size:
 			# Read 1400 bytes at a time, lower than max segment size to avoid issues but not so low that it will be slow
 			data = f.read(size-sent)
@@ -136,6 +174,11 @@ class TCPHandler():
 		if verbose:
 			print("Send complete - "+sent+" bytes transmitted")
 		return sent
+
+	def recvFile(self,path):
+		# Prepares to receive the file and saves it to the designated path
+		## Returns total number of bytes written to the file, -1 if failed
+		return True
 
 # Function to send the request packet to the FTS
 ## Returns the response packet (type 0x03) if the connection was successful, None otherwise
