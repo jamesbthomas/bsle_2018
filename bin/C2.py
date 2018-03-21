@@ -200,7 +200,7 @@ def enterSocket():
 
 # Usage function to print switches and input
 def usage():
-	print("Usage: python3 C2.py [-hv] -e '<encoding pattern>' -p <passphrase> -d <ip>:<port> [-f] <file>")
+	print("Usage: sudo python3 C2.py [-hv] -e '<encoding pattern>' -p <passphrase> -d <ip>:<port> [-f] <file>")
 	return 0
 
 # Help function called by --help and -h
@@ -247,18 +247,16 @@ if __name__ == "__main__":
 	# Check for command line args and pass to main
 	try:
 		opts,args = getopt.getopt(sys.argv[1:],"vhe:p:f:d:",["help","encode=","passphrase=","file=","destination==","verbose"])
+		opt.index(('-h',''))
+		help()
+		sys.exit())
 	except getopt.GetoptError as err:
 		print(err)
 		usage()
 		sys.exit(1)
-
-	try:
-		opts.index(('-h',''))
-		help()
-		sys.exit(0)
 	except ValueError:
 		try:
-			opts.index(("--help",''))
+			opts.index(('--help',''))
 			help()
 			sys.exit(0)
 		except ValueError:
