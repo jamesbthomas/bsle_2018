@@ -5,9 +5,10 @@ sys.path.append('../../bin')
 sys.path.append('../headers')
 # Add the path to C2 to python's path so we can import it here, path addition is volatile
 try:
-	from C2 import fileValidate,socketValidate
+	from C2 import socketValidate
 	from packetCrafter import *
 	from encoder import *
+	from fileHandler import *
 except ImportError:
 	print("ERROR: Can only be run from projectroot/src/testharness/")
 	# TODO See if there is a way around this
@@ -22,6 +23,7 @@ class DefaultTestCase(unittest.TestCase):
 		sys.stdout = self.stdout
 		self.pc = PacketCrafter()
 		self.enc = Encoder("^2:40;rol1:120")
+		self.handler = FileHandler()
 
 	def tearDown(self):
 		# Reset stdout
@@ -74,30 +76,30 @@ class FileValidateTestCase(DefaultTestCase):
 	def runTest(self):
 		# Known valid files
 		## Relative Path
-		f = fileValidate("../../bin/C2.py")
+		f = self.handler.fileValidate("../../bin/C2.py")
 		self.assertNotEqual(f,None)
 		f.close()
-		f = fileValidate("./README.md")
+		f = self.handler.fileValidate("./README.md")
 		self.assertNotEqual(f,None)
 		f.close()
 		## Absolute Path (Assumes *nix system)
-		f = fileValidate("/usr/lib/os-release")
+		f = self.handler.fileValidate("/usr/lib/os-release")
 		self.assertNotEqual(f,None)
 		f.close()
-		f = fileValidate("/etc/passwd")
+		f = self.handler.fileValidate("/etc/passwd")
 		self.assertNotEqual(f,None)
 		f.close()
 		# Known invalid files
 		## Relative Path
-		self.assertEqual(fileValidate("../../badfile"),None)
-		self.assertEqual(fileValidate("../anotherbad"),None)
-		self.assertEqual(fileValidate("badhere"),None)
+		self.assertEqual(self.handler.fileValidate("../../badfile"),None)
+		self.assertEqual(self.handler.fileValidate("../anotherbad"),None)
+		self.assertEqual(self.handler.fileValidate("badhere"),None)
 		## Absoluate Path
-		self.assertEqual(fileValidate("/etc/badfile"),None)
-		self.assertEqual(fileValidate("/home/baddir"),None)
+		self.assertEqual(self.handler.fileValidate("/etc/badfile"),None)
+		self.assertEqual(self.handler.fileValidate("/home/baddir"),None)
 		# Malformed Path
-		self.assertEqual(fileValidate(".../."),None)
-		self.assertEqual(fileValidate("$/.."),None)
+		self.assertEqual(self.handler.fileValidate(".../."),None)
+		self.assertEqual(self.handler.fileValidate("$/.."),None)
 
 class socketValidateTestCase(DefaultTestCase):
 
@@ -213,6 +215,15 @@ class CraftResponseTestCase(DefaultTestCase):
 		self.assertEqual(second,None)
 		third = self.pc.craftResponse(65536,b"high port")
 		self.assertEqual(third,None)
+
+class ContainsTestCase(DefaultTestCase):
+
+	def runTest(self):
+		self.assertEqual(self.handler.contains("/etc/hosts","127.0.0.1"),"127.0.0.1	localhost\n")
+		self.assertEqual(self.handler.contains("/etc/hosts","::1"),"::1     ip6-localhost ip6-loopback\n")
+		self.assertEqual(self.handler.contains("../headers/packetCrafter.py","this is not there"),None)
+		self.assertEqual(self.handler.contains("../headers/packetCrafter.py","# Python3 Source File"),"# Python3 Source File for the PacketCrafter class used to craft packets for the custom communication protocol and supporting functions\n")
+		self.assertEqual(self.handler.contains("/etc/hosts",1),"127.0.0.1	localhost\n")
 
 if __name__ == "__main__":
 	unittest.main()

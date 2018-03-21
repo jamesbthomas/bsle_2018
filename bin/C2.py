@@ -1,10 +1,12 @@
 # Source file for C2 Program written in Python3
 # TODO check permissions, make sure this is being run as superuser
+# TODO change directory around so that we can still import but run this from anywhere
 import getopt, sys, os, re
 from scapy.all import *
 sys.path.append("../src/headers")
 try:
 	from packetCrafter import *
+	from fileHandler import *
 except ImportError:
 	print("Error: must be run from projectroot/bin")
 	sys.exit(1)
@@ -23,6 +25,9 @@ def main(opts,args):
 	phrase = None
 	socket = None
 
+	# Prep the file handler
+	handler = FileHandler()
+
 	# Check to see if options were provided on the command line
 	if (len(opts) < 1):
 		# Run the prompt sequence
@@ -34,7 +39,7 @@ def main(opts,args):
 			except KeyboardInterrupt:
 				print("\nBye!")
 				sys.exit(0)
-			file = fileValidate(path)
+			file = handler.fileValidate(path)
 			if file != None:
 				break
 
@@ -51,14 +56,8 @@ def main(opts,args):
 		except KeyboardInterrupt:
 			print("\nBye!")
 			sys.exit(0)
-		while True:
-			try:
-				socket = input("Destination Socket: ").strip()
-			except KeyboardInterrupt:
-				print("\nBye!")
-				sys.exit(0)
-			if socketValidate(socket):
-				break
+
+		socket = choose(pattern)
 
 	else:
 		# Initialize variables based on contents in opts and args
@@ -71,7 +70,7 @@ def main(opts,args):
 				phrase = val.strip()
 			elif switch == "-f" or switch == "--file":
 				path = val.strip()
-				file = fileValidate(path)
+				file = handler.fileValidate(path)
 				if not file:
 					sys.exit(1)
 			elif switch == "-d" or switch == "--destination":
@@ -83,7 +82,7 @@ def main(opts,args):
 		if not path:
 			try:
 				path = args[0].strip()
-				file = fileValidate(path)
+				file = handler.fileValidate(path)
 				if not file:
 					sys.exit(1)
 			except IndexError as err:
@@ -101,7 +100,7 @@ def main(opts,args):
 				break
 			elif not interactive:
 				print("Failed to initiate connection...\nExiting...\nBye!")
-				sys.exit(2)
+				sys.exit(3)
 			else:
 				print("Failed to initiate connection...")
 				while True:
@@ -111,7 +110,7 @@ def main(opts,args):
 						break
 					elif cont == 'n':
 						print("Exiting...\nBye!")
-						sys.exit(2)
+						sys.exit(3)
 					else:
 						print("Please enter either \'y\' or \'n\'")
 						continue
@@ -119,10 +118,13 @@ def main(opts,args):
 		print("Bye!")
 		sys.exit(0)
 
-	# TODO extract TCP Port (9-10) and validation message (11+)
+	# Extract TCP port and verify validation message
+	tcpPort = crafter.unpackResponse(response,phrase)
+	if not tcpPort:
+		sys.exit(3)
 
-	# TODO confirm validation message == initialization message
-		## If it does, add the FSS to the list of valid FSS (addr,port,pattern)
+	if not handler.contains("IPAddWhiteList",addr):
+		handler.add("IPAddWhiteList",addr+","+port+","+pattern)
 
 	# TODO Data Transfer
 		## TCP Three-way Handshake
@@ -132,6 +134,8 @@ def main(opts,args):
 	print("Bye!")
 	return 0
 
+# Function to send the request packet to the FTS
+## Returns the response packet if the connection was successful, None otherwise
 def requestTransfer(addr,port,pattern,phrase,ftsAddr):
 	crafter = PacketCrafter()
 	requestPacket = crafter.craftRequest(addr,port,pattern,phrase)
@@ -148,6 +152,58 @@ def requestTransfer(addr,port,pattern,phrase,ftsAddr):
 		if verbose:
 			print("Timed out...")
 	return None
+
+# Function to facilitate interactively choosing a FSS
+def choose(pattern):
+	output=[]
+	try:
+		with open("IPAddWhiteList") as f:
+			num = 1
+			for line in f:
+				parts=line.split(",")
+				if len(parts) != 3:
+					print("Internal Error: IPAddWhiteList Misformatted")
+					sys.exit(3)
+				if parts[2].rstrip() == pattern:
+					output.append("   "+str(num)+")\t"+parts[0]+":"+parts[1]+"\t"+parts[2]+"\n")
+					num += 1
+		print("")
+		for i in range(len(output)):
+			print(output[i])
+
+	except FileNotFoundError:
+		f=open("IPAddWhiteList","w")
+		f.close()
+
+	if len(output) == 0:
+		print("No valid FSS found for that encoding pattern, please manually enter a socket")
+		return enterSocket()
+	else:
+		try:
+			choice = input("Choose a socket from one listed above my entering the number to the left, or enter 0 to submit a new socket: ").strip()
+			if choice == "0":
+				return enterSocket()
+			else:
+				entry = output[int(choice)-1].split("\t")[1] # extract the IP address and port
+				return entry
+		except KeyboardInterrupt:
+			print("Bye!")
+			sys.exit(0)
+
+# Helper for choose
+def enterSocket():
+	while True:
+		try:
+			socket = input("Destination Socket: ").strip()
+		except KeyboardInterrupt:
+			print("\nBye!")
+			sys.exit(0)
+
+		if socketValidate(socket):
+			break
+	return socket
+
+
 
 # Usage function to print switches and input
 def usage():
@@ -170,16 +226,6 @@ def help():
 	print("\t -v \t\t optional, same as --verbose")
 	print("\t -h\t\t same as --help, displays this menu")
 	return 0
-
-# Function to validate that a provided file exists
-## Takes the filepath as input and returns a file object if the file exists, returns None otherwise
-def fileValidate(path):
-	try:
-		f = open(path,"rb")
-		return f
-	except FileNotFoundError as err:
-		print("File not found")
-		return None
 
 # Function to validate that a provided socket is valid
 ## Return Value 0 - Socket is not valid
@@ -245,4 +291,5 @@ if __name__ == "__main__":
 # Exit Codes
 ## 0 - success
 ## 1 - input error
-## 2 - could not complete initialization sequence (UDP)
+## 2 - internal error
+## 3 - could not complete initialization sequence (UDP)

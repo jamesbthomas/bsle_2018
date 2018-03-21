@@ -27,18 +27,14 @@ class PacketCrafter:
 		else:
 			return pkt
 
-	def craftInit(self,message):
-		# Craft Packet Type 0x01
-		pkt = Init()
-		pkt.encMessage = message
-		return pkt
-
-	def craftResponse(self,port,message):
-		# Craft Packet Type 0x02 and 0x03
-		pkt = Response()
-		pkt.tcpPort = port
-		pkt.validation = message
-		return pkt
+	def unpackInit(self,pkt):
+		# Unpack Packet Type 0x01
+		# Verifies packet type and returns the encoded initialization message, or None if error
+		# TODO find a way to automate testing this, see unpackResponse
+		if (int(pkt.load[0]) != 1):
+			print("Error: Invalid Packet Type")
+			return None
+		return pkt.load[1:]
 
 	def convertAddr(self,addr):
 		# Convert an IP address from a string to a number that can be put into the packet
@@ -61,7 +57,8 @@ class PacketCrafter:
 		return decimal
 
 	def craftResponse(self,port,message):
-		# Takes the encrypted validation message and crafts the response packet
+		# Craft Packet type 0x02/0x03
+		# Takes the encrypted validation message and port to initiate the TCP transfer on
 		pkt = Response()
 		if port < 1 or port > 65535:
 			print("Error: Invalid Port Number")
@@ -69,6 +66,23 @@ class PacketCrafter:
 		pkt.tcpPort = port
 		pkt.validation = message
 		return pkt
+
+	def unpackResponse(self,pkt,message):
+		# Unpack Packet Type 0x03
+		# Takes the packet and initialization message and returns the TCP Port for the transfer or None if the validation message does not match
+		# TODO find a way to convert unsent packet into raw bytes so we can unit test this
+		if int(pkt.load[0]) != 3:
+			print("Error: Invalid Packet Type")
+			return None
+		tcpPort = pkt.load[1:3]
+		if tcpPort < 1 or tcpPort > 65535:
+			print("Error: Could not validate response - invalid TCP port number")
+			return None
+		validation = pkt.load[3:]
+		if validation != message:
+			print("Error: Could not validate response - incorrect validation message")
+			return None
+		return tcpPort
 
 class Request(Packet):
 	# Packet Type 0x00 - C2 -> FTS
@@ -80,12 +94,20 @@ class Request(Packet):
 			StrLenField("pattern",""),
 			StrLenField("message","") ]
 
+	def bytes(self):
+		# Test function used to extract the byte string representing this layer
+		return True
+
 class Response(Packet):
 	# Packet Type 0x02 - FSS -> FTS
 	name = "FTResponse"
 	fields_desc = [ByteField("packetType",2),
 			ShortField("tcpPort",0),
 			StrLenField("validation","") ]
+
+	def payload(self):
+		# Test function used to extract the byte string representing this layer
+		return self.packetType
 
 # Function to validate that a provided pattern is valid
 ## Return Value 0 - pattern is not valid
