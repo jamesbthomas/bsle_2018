@@ -18,7 +18,9 @@ class PacketCrafter:
 		else:
 			pkt.fssPort = int(port)
 		pkt.patternLength = len(pattern)
-		pkt.pattern = self.convertPattern(pattern)
+		if not patternValidate(pattern):
+			return None
+		pkt.pattern = pattern
 		pkt.message = phrase
 		if pkt.fssAddress == None or pkt.fssPort == None or pkt.pattern == None:
 			return None
@@ -58,33 +60,6 @@ class PacketCrafter:
 			numOct += 1
 		return decimal
 
-	def convertPattern(self,pattern):
-		# Convert encoding pattern from a string into a 4byte value
-		# Split into options, each option gets 2 bytes
-		opts = pattern.split(";")
-		if len(opts) != 2:
-			print("Error: Invalid Encoding Pattern")
-			return None
-		packed = b''
-		# Split into operation/length, each gets 1 byte
-		for opt in opts:
-			opLen = opt.split(":")
-			if len(opLen) != 2:
-				print("Error: Invalid Option Format")
-				return None
-			if opLen[0][0] == "~":	# b 01
-				if (len(opLen[0]) != 1):
-					print("Error: Invalid Operation")
-					return None
-				packed += pack("BB",64,int(opLen[1]))
-			elif opLen[0][0:3] == "ror":	# b 10
-				packed += pack("BB",(2*64)+int(opLen[0][3:]),int(opLen[1]))
-			elif opLen[0][0:3] == "rol":	# b 11
-				packed += pack("BB",(3*64)+int(opLen[0][3:]),int(opLen[1]))
-			elif opLen[0][0] == "^":	# b 00
-				packed += pack("BB",int(opLen[0][1:]),int(opLen[1]))
-		return packed
-
 	def craftResponse(self,port,message):
 		# Takes the encrypted validation message and crafts the response packet
 		pkt = Response()
@@ -102,7 +77,7 @@ class Request(Packet):
 			IntField("fssAddress",0),
 			ShortField("fssPort",0),
 			ShortField("patternLength",0),
-			StrFixedLenField("pattern","",length_from=lambda x:4),
+			StrLenField("pattern",""),
 			StrLenField("message","") ]
 
 class Response(Packet):
@@ -112,6 +87,21 @@ class Response(Packet):
 			ShortField("tcpPort",0),
 			StrLenField("validation","") ]
 
+# Function to validate that a provided pattern is valid
+## Return Value 0 - pattern is not valid
+## Return Value 1 - pattern is valid
+def patternValidate(pattern):
+	opts = pattern.split(";")
+	if (len(opts) < 2):
+		print("Error: Insufficient Encoding Options")
+		return 0
+	for set in opts:
+		if not re.match('(~|\^\d+|ror\d+|rol\d+):\d+',set):
+			print("Error: Invalid Encoding Pattern")
+			return 0
+	return 1
+
 # Used for dev testing
 if __name__ == "__main__":
 	pc = PacketCrafter()
+	print(pc.craftRequest("127.0.0.1",1111,"~:2~:2","pass").pattern)

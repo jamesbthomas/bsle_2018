@@ -14,7 +14,7 @@ def main(opts,args):
 	print("Starting FTS C2 program...")
 
 	# TODO FTS IP address
-	ftsAddr = "10.0.0.15"
+	ftsAddr = "10.0.0.2"
 	# TODO FTS IP Address
 
 	file = None
@@ -26,6 +26,8 @@ def main(opts,args):
 	# Check to see if options were provided on the command line
 	if (len(opts) < 1):
 		# Run the prompt sequence
+		global interactive
+		interactive  = True
 		while True:
 			try:
 				path = input("Path to file: ").strip()
@@ -92,16 +94,35 @@ def main(opts,args):
 	addr = parts[0]
 	port = parts[1]
 
-	# TODO IPAddWhiteList
-		## Managed from the command line, user provides input, if the FTS returns a valid initialization message it checks IPAddWhitelist and adds if it doesnt exist
+	try:
+		while True:
+			response = requestTransfer(addr,port,pattern,phrase,ftsAddr)
+			if response != None:
+				break
+			elif not interactive:
+				print("Failed to initiate connection...\nExiting...\nBye!")
+				sys.exit(2)
+			else:
+				print("Failed to initiate connection...")
+				while True:
+					cont = input("Would you like to continue? [y/n]: ").strip()
+					if cont == 'y':
+						print("Trying again...")
+						break
+					elif cont == 'n':
+						print("Exiting...\nBye!")
+						sys.exit(2)
+					else:
+						print("Please enter either \'y\' or \'n\'")
+						continue
+	except KeyboardInterrupt:
+		print("Bye!")
+		sys.exit(0)
 
-	# TODO Wait to receive unencrypted validation message
-		## Timeout
-		## IP Whitelist of valid FSS
-	crafter = PacketCrafter()
-	requestPacket = crafter.craftRequest(addr,port,pattern,phrase)
-	pkt = IP(dst=ftsAddr,src="10.0.0.15") / UDP(sport=65535,dport=1337) / requestPacket
-	send(pkt)
+	# TODO extract TCP Port (9-10) and validation message (11+)
+
+	# TODO confirm validation message == initialization message
+		## If it does, add the FSS to the list of valid FSS (addr,port,pattern)
 
 	# TODO Data Transfer
 		## TCP Three-way Handshake
@@ -111,9 +132,26 @@ def main(opts,args):
 	print("Bye!")
 	return 0
 
+def requestTransfer(addr,port,pattern,phrase,ftsAddr):
+	crafter = PacketCrafter()
+	requestPacket = crafter.craftRequest(addr,port,pattern,phrase)
+	for ftsPort in range(16000,17001):
+		if ftsPort%100 == 0 and not verbose and ftsPort != 16000:
+			print("Trying to connect... 16000 -",ftsPort," unavailable")
+		if verbose:
+			print("Trying port ",ftsPort,". . .")
+		request = IP(dst=ftsAddr) / UDP(dport=ftsPort) / requestPacket
+		response = sr1(request,timeout=0.1,verbose=False)
+		if response:
+			print("Connection established!")
+			return response
+		if verbose:
+			print("Timed out...")
+	return None
+
 # Usage function to print switches and input
 def usage():
-	print("Usage: python3 C2.py [-h] -e '<encoding pattern>' -p <passphrase> -d <ip>:<port> [-f] <file>")
+	print("Usage: python3 C2.py [-hv] -e '<encoding pattern>' -p <passphrase> -d <ip>:<port> [-f] <file>")
 	return 0
 
 # Help function called by --help and -h
@@ -129,8 +167,8 @@ def help():
 	print("\t -p <phrase>\t same as --passphrase, specifies the passphrase to be used to initialize the file transfer session")
 	print("\t -d <ip>:<port> /t same as --destination, specifies the IP Address and port of the FSS server to send to")
 	print("\t -f <filepath>\t optional, same as --file, specifies which file you want to transfer")
+	print("\t -v \t\t optional, same as --verbose")
 	print("\t -h\t\t same as --help, displays this menu")
-	# TODO add a -v verbose option
 	return 0
 
 # Function to validate that a provided file exists
@@ -142,20 +180,6 @@ def fileValidate(path):
 	except FileNotFoundError as err:
 		print("File not found")
 		return None
-
-# Function to validate that a provided encoding pattern is legitimate
-## Return Value 0 - encode pattern is not valid
-## Return Value 1 - encode pattern is valid
-def patternValidate(pattern):
-	options = pattern.split(";")
-	if (len(options) < 2):
-		print("Error: Insufficient Encoding Options")
-		return 0
-	for set in options:
-		if not re.match('(~|\^\d+|ror\d+|rol\d+):\d+',set):
-			print("Error: Invalid Encoding Pattern")
-			return 0
-	return 1
 
 # Function to validate that a provided socket is valid
 ## Return Value 0 - Socket is not valid
@@ -183,9 +207,15 @@ def socketValidate(socket):
 	return 1
 
 if __name__ == "__main__":
+	# Global Variables to mark the session as interactive and/or verbose
+	global interactive
+	interactive = False
+	global verbose
+	verbose = False
+
 	# Check for command line args and pass to main
 	try:
-		opts,args = getopt.getopt(sys.argv[1:],"he:p:f:d:",["help","encode=","passphrase=","file=","destination=="])
+		opts,args = getopt.getopt(sys.argv[1:],"vhe:p:f:d:",["help","encode=","passphrase=","file=","destination==","verbose"])
 	except getopt.GetoptError as err:
 		print(err)
 		usage()
@@ -195,7 +225,18 @@ if __name__ == "__main__":
 		opts.index(('-h',''))
 		help()
 		sys.exit(0)
-	except ValueError as err:
+	except ValueError:
+		try:
+			opts.index(("--help",''))
+			help()
+			sys.exit(0)
+		except ValueError:
+			pass
+
+	try:
+		if opts.index(('-v','')):
+			verbose=True
+	except ValueError:
 		pass
 
 	main(opts,args)
@@ -204,3 +245,4 @@ if __name__ == "__main__":
 # Exit Codes
 ## 0 - success
 ## 1 - input error
+## 2 - could not complete initialization sequence (UDP)

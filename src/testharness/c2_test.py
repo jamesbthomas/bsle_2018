@@ -5,7 +5,7 @@ sys.path.append('../../bin')
 sys.path.append('../headers')
 # Add the path to C2 to python's path so we can import it here, path addition is volatile
 try:
-	from C2 import patternValidate,fileValidate,addrValidate
+	from C2 import fileValidate,socketValidate
 	from packetCrafter import *
 	from encoder import *
 except ImportError:
@@ -99,19 +99,25 @@ class FileValidateTestCase(DefaultTestCase):
 		self.assertEqual(fileValidate(".../."),None)
 		self.assertEqual(fileValidate("$/.."),None)
 
-class AddrValidateTestCase(DefaultTestCase):
+class socketValidateTestCase(DefaultTestCase):
 
 	def runTest(self):
-		# Valid IP
-		self.assertTrue(addrValidate("127.0.0.1"))
-		self.assertTrue(addrValidate("8.8.8.8"))
-		self.assertTrue(addrValidate("10.73.195.4"))
+		# Valid Socket
+		self.assertTrue(socketValidate("127.0.0.1:1"))
+		self.assertTrue(socketValidate("8.8.8.8:4000"))
+		self.assertTrue(socketValidate("10.73.195.4:65535"))
 		# Invalid IP
-		self.assertFalse(addrValidate("256.256.256.256"))
-		self.assertFalse(addrValidate("a.b.c.d"))
-		self.assertFalse(addrValidate("0.0.0.-1"))
-		self.assertFalse(addrValidate("0.0.0.0"))
-		self.assertFalse(addrValidate("255.255.255.255"))
+		self.assertFalse(socketValidate("256.256.256.256:1"))
+		self.assertFalse(socketValidate("a.b.c.d:1"))
+		self.assertFalse(socketValidate("0.0.0.-1:1"))
+		self.assertFalse(socketValidate("0.0.0.0:1"))
+		self.assertFalse(socketValidate("255.255.255.255:1"))
+		# Invalid Port
+		self.assertFalse(socketValidate("127.0.0.1:0"))
+		self.assertFalse(socketValidate("127.0.0.1:65536"))
+		# Invalid Format
+		self.assertFalse(socketValidate("127001:1"))
+		self.assertFalse(socketValidate("127.0.0.14000"))
 
 class ConvertAddrTestCase(DefaultTestCase):
 
@@ -119,14 +125,6 @@ class ConvertAddrTestCase(DefaultTestCase):
 		self.assertEqual(self.pc.convertAddr("127.0.0.1"),2130706433)
 		self.assertEqual(self.pc.convertAddr("0.0.0.0"),0)
 		self.assertEqual(self.pc.convertAddr("255.255.255.255"),4294967295)
-
-class ConvertPatternTestCase(DefaultTestCase):
-
-	def runTest(self):
-		self.assertEqual(unpack("BBBB",self.pc.convertPattern("^2:40;rol1:120")),(2,40,193,120))
-		self.assertEqual(unpack("BBBB",self.pc.convertPattern("~:20;ror3:40")),(64,20,131,40))
-		self.assertEqual(unpack("BBBB",self.pc.convertPattern("ror8:80;^16:160")),(136,80,16,160))
-		self.assertEqual(unpack("BBBB",self.pc.convertPattern("~:63;^63:255")),(64,63,63,255))
 
 class EncoderTestCase(DefaultTestCase):
 
@@ -192,7 +190,7 @@ class CraftRequestTestCase(DefaultTestCase):
 		self.assertEqual(firstTest.fssAddress,self.pc.convertAddr("127.0.0.1"))
 		self.assertEqual(firstTest.fssPort,1111)
 		self.assertEqual(firstTest.patternLength,len("~:40;rol1:120"))
-		self.assertEqual(firstTest.pattern,self.pc.convertPattern("~:40;rol1:120"))
+		self.assertEqual(firstTest.pattern,b"~:40;rol1:120")
 		self.assertEqual(firstTest.message,b"firstTest")
 		secondTest = self.pc.craftRequest("127001","1111","~:40;rol1:120","secondTest")
 		self.assertEqual(secondTest,None)
