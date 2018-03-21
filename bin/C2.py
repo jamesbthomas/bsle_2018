@@ -1,12 +1,14 @@
 # Source file for C2 Program written in Python3
 # TODO check permissions, make sure this is being run as superuser
 # TODO change directory around so that we can still import but run this from anywhere
+# TODO TEST WITH TCPHANDLER!!!
 import getopt, sys, os, re
 from scapy.all import *
 sys.path.append("../src/headers")
 try:
 	from packetCrafter import *
 	from fileHandler import *
+	from tcpHandler import *
 except ImportError:
 	print("Error: must be run from projectroot/bin")
 	sys.exit(1)
@@ -35,14 +37,12 @@ def main(opts,args):
 		interactive  = True
 		while True:
 			try:
-				path = input("Path to file: ").strip()
+				file = input("Path to file: ").strip()
 			except KeyboardInterrupt:
 				print("\nBye!")
 				sys.exit(0)
-			file = handler.fileValidate(path)
-			if file != None:
+			if not handler.fileValidate(file):
 				break
-
 		while True:
 			try:
 				pattern = input("Encoding Pattern: ").strip()
@@ -69,9 +69,8 @@ def main(opts,args):
 			elif switch == "-p" or switch == "--passphrase":
 				phrase = val.strip()
 			elif switch == "-f" or switch == "--file":
-				path = val.strip()
-				file = handler.fileValidate(path)
-				if not file:
+				file = val.strip()
+				if not handler.fileValidate(file):
 					sys.exit(1)
 			elif switch == "-d" or switch == "--destination":
 				socket = val.strip()
@@ -79,11 +78,10 @@ def main(opts,args):
 					sys.exit(1)
 
 		# If user didnt provide file through a switch, check args
-		if not path:
+		if not file:
 			try:
-				path = args[0].strip()
-				file = handler.fileValidate(path)
-				if not file:
+				file = args[0].strip()
+				if not handler.fileValidate(file):
 					sys.exit(1)
 			except IndexError as err:
 				print("Error parsing command line options: "+str(err))
@@ -124,34 +122,29 @@ def main(opts,args):
 		sys.exit(3)
 
 	if not handler.contains("IPAddWhiteList",addr):
-		handler.add("IPAddWhiteList",addr+","+port+","+pattern)
+		if handler.add("IPAddWhiteList",addr+","+port+","+pattern) != len(addr+","+port+","+pattern+"\n"):
+			print("Error: Internel - Failed to add to IPAddWhiteList")
+			sys.exit(2)
 
-	# TODO Data Transfer
+	# Data Transfer
+	tcp = TCPHandler()
 		## TCP Three-way Handshake
+	if not handshake(verbose):
+		print("Error: TCP Handshake Failed")
+		sys.exit(4)
 		## Data transfer
+	fsize = os.stat(file).st_size
+	if sendFile(file,fsize,verbose) != fsize:
+		print("WARNING: Total bytes sent does not match file size")
 		## TCP Close
+	try:
+		while not close(verbose):
+			print("Retrying close...")
+	except KeyboardInterrupt:
+		print("WARNING: Exiting without closing TCP Connection")
 
 	print("Bye!")
 	return 0
-
-# Function to send the request packet to the FTS
-## Returns the response packet if the connection was successful, None otherwise
-def requestTransfer(addr,port,pattern,phrase,ftsAddr):
-	crafter = PacketCrafter()
-	requestPacket = crafter.craftRequest(addr,port,pattern,phrase)
-	for ftsPort in range(16000,17001):
-		if ftsPort%100 == 0 and not verbose and ftsPort != 16000:
-			print("Trying to connect... 16000 -",ftsPort," unavailable")
-		if verbose:
-			print("Trying port ",ftsPort,". . .")
-		request = IP(dst=ftsAddr) / UDP(dport=ftsPort) / requestPacket
-		response = sr1(request,timeout=0.1,verbose=False)
-		if response:
-			print("Connection established!")
-			return response
-		if verbose:
-			print("Timed out...")
-	return None
 
 # Function to facilitate interactively choosing a FSS
 def choose(pattern):
@@ -234,23 +227,15 @@ def socketValidate(socket):
 	parts = socket.split(":")
 	if (len(parts) != 2):
 		print("Error: Invalid Socket Format")
-		return 0
+		return False
 	# Check IP Address
-	try:
-		for oct in re.match('([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})',parts[0]).groups():
-			assert(int(oct) <= 255)
-			assert(int(oct) >= 0)
-		if parts[0] == "0.0.0.0" or parts[0] == "255.255.255.255":
-			# Check for any and broadcast, no reason to use these
-			raise Exception
-	except Exception:
-		print("Error: Invalid IP Address")
-		return 0
+	if not addrValidate(parts[0]):
+		return False
 	# Check Port Number
 	if (int(parts[1]) > 65535 or int(parts[1]) < 1):
 		print("Error: Invalid Port Number")
-		return 0
-	return 1
+		return False
+	return True
 
 if __name__ == "__main__":
 	# Global Variables to mark the session as interactive and/or verbose
@@ -293,3 +278,4 @@ if __name__ == "__main__":
 ## 1 - input error
 ## 2 - internal error
 ## 3 - could not complete initialization sequence (UDP)
+## 4 - TCP Error
