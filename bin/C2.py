@@ -1,5 +1,4 @@
 # Source file for C2 Program written in Python3
-# TODO check permissions, make sure this is being run as superuser
 # TODO TEST WITH TCPHANDLER!!!
 import getopt, sys, os, re
 from scapy.all import *
@@ -239,6 +238,11 @@ def socketValidate(socket):
 	return True
 
 if __name__ == "__main__":
+	# Check permissions
+	if os.geteuid() != 0:
+		print("Error: Must be run as superuser")
+		usage()
+		sys.exit(0)
 	# Global Variables to mark the session as interactive and/or verbose
 	global interactive
 	interactive = False
