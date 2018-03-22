@@ -2,6 +2,7 @@
 import re, random, os, time
 from scapy.all import *
 from encoder import *
+from packetCrafter import *
 # TODO TEST!!!!!
 class TCPHandler():
 
@@ -220,20 +221,20 @@ class TCPHandler():
 
 # Function to send the request packet to the FTS
 ## Returns the response packet (type 0x03) if the connection was successful, None otherwise
-def requestTransfer(addr,port,pattern,phrase,ftsAddr):
+def requestTransfer(addr,port,pattern,phrase,ftsAddr,verbose):
 	crafter = PacketCrafter()
 	requestPacket = crafter.craftRequest(addr,port,pattern,phrase)
 	for ftsPort in range(16000,17001):
-		if ftsPort%100 == 0 and not self.verbose and ftsPort != 16000:
+		if ftsPort%100 == 0 and not verbose and ftsPort != 16000:
 			print("Trying to connect... 16000 - ",ftsPort,"unavailable")
-		if self.verbose:
+		if verbose:
 			print("Trying port ",ftsPort,". . . ")
 		request = IP(dst=ftsAddr) / UDP(dport=ftsPort) / requestPacket
 		response = sr1(request,timeout=0.1,verbose=False)
 		if response:
 			print("Connection established!")
 			return response
-		if self.verbose:
+		if verbose:
 			print("Timed out...")
 
 	return None

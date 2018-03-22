@@ -1,17 +1,15 @@
 # Source file for C2 Program written in Python3
 # TODO check permissions, make sure this is being run as superuser
-# TODO change directory around so that we can still import but run this from anywhere
 # TODO TEST WITH TCPHANDLER!!!
 import getopt, sys, os, re
 from scapy.all import *
-sys.path.append("../src/headers")
-try:
-	from packetCrafter import *
-	from fileHandler import *
-	from tcpHandler import *
-except ImportError:
-	print("Error: must be run from projectroot/bin")
-	sys.exit(1)
+file_loc = os.path.dirname(os.path.realpath(__file__)) # Find the directory this file is stored in
+print(file_loc)
+headers_dir = "/".join(file_loc.split("/")[:-1])+"/src/headers"	# Location of the header file
+sys.path.append(headers_dir)
+from packetCrafter import *
+from fileHandler import *
+from tcpHandler import *
 
 # Main function
 def main(opts,args):
@@ -41,7 +39,7 @@ def main(opts,args):
 			except KeyboardInterrupt:
 				print("\nBye!")
 				sys.exit(0)
-			if not handler.fileValidate(file):
+			if handler.fileValidate(file):
 				break
 		while True:
 			try:
@@ -93,7 +91,7 @@ def main(opts,args):
 
 	try:
 		while True:
-			response = requestTransfer(addr,port,pattern,phrase,ftsAddr)
+			response = requestTransfer(addr,port,pattern,phrase,ftsAddr,verbose)
 			if response != None:
 				break
 			elif not interactive:
@@ -121,8 +119,8 @@ def main(opts,args):
 	if not tcpPort:
 		sys.exit(3)
 
-	if not handler.contains("IPAddWhiteList",addr):
-		if handler.add("IPAddWhiteList",addr+","+port+","+pattern) != len(addr+","+port+","+pattern+"\n"):
+	if not handler.contains(file_loc+"/IPAddWhiteList",addr):
+		if handler.add(file_loc+"/IPAddWhiteList",addr+","+port+","+pattern) != len(addr+","+port+","+pattern+"\n"):
 			print("Error: Internel - Failed to add to IPAddWhiteList")
 			sys.exit(2)
 
@@ -150,7 +148,7 @@ def main(opts,args):
 def choose(pattern):
 	output=[]
 	try:
-		with open("IPAddWhiteList") as f:
+		with open(file_loc+"/IPAddWhiteList") as f:
 			num = 1
 			for line in f:
 				parts=line.split(",")
@@ -165,7 +163,7 @@ def choose(pattern):
 			print(output[i])
 
 	except FileNotFoundError:
-		f=open("IPAddWhiteList","w")
+		f=open(file_loc+"/IPAddWhiteList","w")
 		f.close()
 
 	if len(output) == 0:
@@ -247,13 +245,15 @@ if __name__ == "__main__":
 	# Check for command line args and pass to main
 	try:
 		opts,args = getopt.getopt(sys.argv[1:],"vhe:p:f:d:",["help","encode=","passphrase=","file=","destination==","verbose"])
-		opt.index(('-h',''))
-		help()
-		sys.exit())
 	except getopt.GetoptError as err:
 		print(err)
 		usage()
 		sys.exit(1)
+
+	try:
+		opt.index(('-h',''))
+		help()
+		sys.exit(0)
 	except ValueError:
 		try:
 			opts.index(('--help',''))
@@ -261,6 +261,8 @@ if __name__ == "__main__":
 			sys.exit(0)
 		except ValueError:
 			pass
+	except NameError: # Catches when C2 is run with no arguments
+		pass
 
 	try:
 		if opts.index(('-v','')):
