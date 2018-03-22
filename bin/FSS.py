@@ -11,7 +11,7 @@ try:
 	from encoder import *
 	from fileHandler import *
 	from tcpHandler import *
-except ImportError as err
+except ImportError as err:
 	print(err)
 	sys.exit(2)
 
@@ -119,6 +119,12 @@ def help():
 	return 0
 
 if __name__ == "__main__":
+	# Check permissions
+	if os.geteuid() != 0:
+		print("Error: Must be run as super user")
+		usage()
+		sys.exit(0)
+	# grab options and pass to main
 	try:
 		opts,args = getopt.getopt(sys.argv[1:],"e:p:hd:v",["help","encode=","port=","destination=","verbose"])
 		opts.index(('-h',''))
@@ -137,6 +143,7 @@ if __name__ == "__main__":
 			pass
 
 	if len(opts) < 2:
+		print("Error: Not enough arguments")
 		usage()
 		sys.exit(1)
 
