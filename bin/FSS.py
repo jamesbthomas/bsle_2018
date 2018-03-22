@@ -1,5 +1,8 @@
 # Python3 Source File for File Storage Service Main Function
 ## Each FSS instance supports exactly one encoding pattern specified by the user at runtime
+# TODO check permissions, should be run as superuser
+# TODO change directory around to support imports
+# TODO TEST!!!!
 import getopt, sys, socket
 sys.path.append("../src/headers")
 try:
@@ -19,6 +22,7 @@ def main(opts):
 	destination = None
 	crafter = PacketCrafter()
 	handler = FileHandler()
+	verbose = False
 
 	for switch,val in opts:
 		if switch == "-e" or switch == "--encode":
@@ -31,6 +35,8 @@ def main(opts):
 				print("Error: Invalid Port Number")
 				sys.exit(1)
 			port = int(val)
+		elif switch == "-v" or switch == "--verbose":
+			verbose = True
 		else:
 			print("Error: Invalid Switch")
 			usage()
@@ -42,25 +48,29 @@ def main(opts):
 
 	encoder = Encoder(pattern)
 
-#	try:
-#		message = None
-#		while message == None:
-#			init = sniff(filter="udp dst port "+str(port),count=1)[0]
-#			message,ftsAddr,ftsPort = crafter.unpackInit(init)
-#		while True:
-#			pass
-#	except IndexError: # Round-about way to keyboard interrupt the sniff
-		# CTRL+C will stop sniff but not through the Interrupt far into the main thread
+	try:
+		message = None
+		while message == None:
+			init = sniff(filter="udp dst port "+str(port),count=1)[0]
+			message,ftsAddr,ftsPort = crafter.unpackInit(init)
+			if verbose:
+				print("Received message from "+ftsAddr+":"+str(ftsPort)+" - "+message)
+		while True:
+			pass
+	except IndexError: # Round-about way to keyboard interrupt the sniff
+		# CTRL+C will stop sniff but not throw the Interrupt into the main thread
 		# If you CTRL+C, then it will IndexError when trying to index into the packets that were sniffed
-#		print("\nBye!")
-#		sys.exit(0)
+		print("\nBye!")
+		sys.exit(0)
 
-#	decoded = encoder.decode(message)
-#	recoded = encoder.encode(decoded)
+	decoded = encoder.decode(message)
+	recoded = encoder.encode(decoded)
+	if verbose:
+		print(message+" -> "+decoded+" -> "+recoded)
 
-#	if message != decoded:
-#		print("Error: Decode/Recode Failure")
-#		sys.exit(2)
+	if message != decoded:
+		print("Error: Decode/Recode Failure")
+		sys.exit(2)
 
 	# Find an open TCP Port in the ephemeral range (49152-65535), open the socket to hold the IP address until we're ready to send/sniff
 	sock = None
@@ -70,15 +80,24 @@ def main(opts):
 		if result == 0:
 			break
 
+	if verbose:
+		print("Local Port - "+str(port))
+
 	# Craft Packet Type 0x02
 	response = crafter.craftResponse(port,recoded)
-	tcp = TCPHandler(ftsAddr,-1,False)
+	tcp = TCPHandler(ftsAddr,-1,verbose)
 	# Close socket, send packet, get ready for the shake
 	sock.close()
 	ready = False
 	while not ready:
-		ready = tcp.shake(port)
-	# Sniff for files
+		ready,path = tcp.shake(port)
+	# Receive the file
+	if verbose:
+		print("Waiting for file...")
+	if tcp.recvFile(path) < 1:
+		sys.exit(2)
+	print("Bye!")
+	sys.exit(0)
 
 # Function to print usage information
 def usage():
@@ -94,12 +113,13 @@ def help():
 	print("\t -e <pattern> \t same as --encode, specifies the encoding pattern that this FSS will support")
 	print("\t -p <port> \t same as --port, specifies the port to listen on")
 	print("\t -d <path> \t optional, same as --destination, specify the destination directory for the FSS to store files")
+	print("\t -v\t\t same as --verbose, display verbose output")
 	print("\t -h\t\t same as --help, display this menu")
 	return 0
 
 if __name__ == "__main__":
 	try:
-		opts,args = getopt.getopt(sys.argv[1:],"e:p:hd:",["help","encode=","port=","destination="])
+		opts,args = getopt.getopt(sys.argv[1:],"e:p:hd:v",["help","encode=","port=","destination=","verbose"])
 		opts.index(('-h',''))
 		help()
 		sys.exit(0)

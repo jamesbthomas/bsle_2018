@@ -1,7 +1,7 @@
 # Python3 Source File for the TCPHandler Class designed to handle sending and receiving TCP packets and associated functions to assist with handling packets
-import re, random, os
-from packetCrafter import *
+import re, random, os, time
 from scapy.all import *
+from encoder import *
 # TODO TEST!!!!!
 class TCPHandler():
 
@@ -11,12 +11,13 @@ class TCPHandler():
 		self.verbose = verbose
 		self.dst = dst
 		self.dport = dport
+		self.sport = None
 		self.seq = randint(0,2147483647)
 		self.lastSeq = 0
 		self.nextSeq = 0
 		self.state = "init"
 
-	def handshake(self,verbose):
+	def handshake(self,filename):
 		# Conducts the TCP three-way handshake with the destination and port provided at init
 		## Returns True if handshake is successful, False otherwise
 		## Used by the C2 to initiate data transfer to the FTS
@@ -24,15 +25,15 @@ class TCPHandler():
 		synAck = None
 		fails = 0 # keep track of how many times we've failed so this doesn't loop forever
 		self.state = "SYN_SENT"
-		while fails < 3:
+		while (fails < 3):
 			synAck = sr1(syn,timeout=0.1)
-			if verbose:
+			if self.verbose:
 				print("Sent SYN \#"+fails)
 			if not synAck:
 				if synAck[TCP].flags != 18:
 					synAck = None
 				fails += 1
-				if verbose:
+				if self.verbose:
 					print("Timeout")
 			else:
 				self.state = "ESTABLISHED"
@@ -41,13 +42,14 @@ class TCPHandler():
 			print("Error: Could not establish TCP connection")
 			self.state = "init"
 			return False
-		if verbose:
+		if self.verbosen:
 			print("SYNACK Received!")
 		# Craft ACK and send
 		self.lastSeq = synAck[TCP].seq
-		ack = IP(dst=self.dst) / TCP(dport=self.dport,flags="A",ack=synAck[TCP].seq+1,seq=synAck[TCP].ack)
+		# Send the filename in the last ACK
+		ack = IP(dst=self.dst) / TCP(dport=self.dport,flags="A",ack=synAck[TCP].seq+1,seq=synAck[TCP].ack) / filename.split("/")[-1:]
 		send(ack)
-		if verbose:
+		if self.verbose:
 			print("ACK Sent - Connection Established")
 		return True
 
@@ -58,7 +60,7 @@ class TCPHandler():
 		fails = 0
 		self.state = "LISTEN"
 		syn = None
-		while fails < 3:
+		while (fails < 3):
 			syn = sniff(filter="tcp dst port "+str(port)+" and ip src host "+self.dst,count=1)[0]
 			if not syn:
 				if syn[TCP].flags != 2:
@@ -72,8 +74,8 @@ class TCPHandler():
 			print("Error: Bad SYN")
 			return False
 		fails = 0
-		synAck = send(IP(dst=self.dst) / TCP(dport=self.dport,flags="SA",ack=syn[TCP].seq+1,seq=self.seq)
-		while fails < 3:
+		synAck = send(IP(dst=self.dst) / TCP(dport=self.dport,flags="SA",ack=syn[TCP].seq+1,seq=self.seq))
+		while (fails < 3):
 			ack = sniff(filter="tcp dst port "+str(port)+" and ip src host "+self.dst,count=1)[0]
 			if not ack:
 				if ack[TCP].flags != 16:
@@ -85,24 +87,25 @@ class TCPHandler():
 		if fails >= 3:
 			print("Error: Bad ACK")
 			return False
-		return True
+		self.sport = port
+		return True,pkt.load
 
-	def close(self,verbose):
+	def close(self):
 		# Close the connection
 		## Returns True if close successful, False otherwise
 		fin = IP(dst=self.dst) / TCP(dport=self.dport,flags="F")
 		fails = 0
 		finAck = None
 		self.state = "FIN_WAIT_1"
-		while fails < 3:
+		while (fails < 3):
 			finAck = sr1(fin1,timeout=0.1)
-			if verbose:
+			if self.verbose:
 				print("Sent FIN \#"+fails)
 			if not finAck:
 				if finAck[TCP].flags != 16:
 					finAck = None
 				fails += 1
-				if verbose:
+				if self.verbose:
 					print("Timeout")
 			else:
 				self.state = "FIN_WAIT_2"
@@ -111,16 +114,16 @@ class TCPHandler():
 			print("Error: Could not close connection")
 			self.state = "ESTABLISHED"
 			return False
-		if verbose:
+		if self.verbose:
 			print("ACK Received from FTS")
 		# Wait for FIN from FTS
 		finServer = None
 		fails = 0
-		if verbose:
+		if self.verbose:
 			print("Waiting for FIN from FTS...")
 		while fails < 3:
 			finServer = sniff(count=1,filter="tcp[tcpflags] & tcp-fin != 0 and src host = "+self.dst)
-			if verbose:
+			if self.verbose:
 				fails += 1
 			else:
 				self.state = "TIME_WAIT"
@@ -129,31 +132,26 @@ class TCPHandler():
 			print("Error: Could not close connection")
 			self.state = "ESTABLISHED"
 			return False
-		if verbose:
+		if self.verbose:
 			print("FIN Received from FTS")
 		# Send final ACK
 		ack = IP(dst=self.dst) / TCP(dport=self.dport,flags="A")
 		send(ack)
-		if verbose:
+		if self.verbose:
 			print("ACK Sent to server - Handler reset to initial conditions")
 		self.seq = randint(0,2147483647)
 		self.lastSeq = 0
 		self.nextSeq = 0
 		self.state = "init"
 
-	def sendFile(self,path,size,verbose):
+	def sendFile(self,path,size):
 		# Checks to see if connection is established and sends the amount of data indicated by size from the file pointed to by path to the destination
 		## Returns total number of bytes transmitted, -1 if failed
 		if self.state != "ESTABLISHED":
 			print("Error: Connection not established")
 			return -1
-		try:
-			f = open(path,"rb")
-		except FileNotFoundError:
-			print("Error: File not found")
-			return -1
 		sent = 0
-		# TODO send a packet that contains the file name so we know what to use on the FSS
+		# Send the file name in the first packet
 		while sent < size:
 			# Read 1400 bytes at a time, lower than max segment size to avoid issues but not so low that it will be slow
 			data = f.read(size-sent)
@@ -161,24 +159,64 @@ class TCPHandler():
 			self.nextSeq = self.lastSeq + len(data)
 			ack = None
 			while ack == None:
-				if verbose:
+				if self.verbose:
 					print("Sent",sent+len(data),"of",size,"bytes")
-				ack = sr1(pkt,timeout=0.1)
+				ack = sr1(pkt,timeout=0.1,verbose=False)
 				if ack[TCP].flags != 16 or ack[TCP].ack != self.nextSeq:
 					ack = None
 				else:
-					if verbose:
+					if self.verbose:
 						print("Received ACK for bytes",sent,"-",len(data))
 					sent += len(data)
 					self.lastSeq = self.nextSeq
-		if verbose:
+		if self.verbose:
 			print("Send complete - "+sent+" bytes transmitted")
 		return sent
 
 	def recvFile(self,path):
 		# Prepares to receive the file and saves it to the designated path
 		## Returns total number of bytes written to the file, -1 if failed
-		return True
+		if self.sport == None:
+			print("Error: Cannot receive files without shaking first")
+			return -1
+		bytesRcvd = 0
+		t = time.localtime()
+		f = open(path+"_"+str(t.tm_hour)+str(t.tm_min)+"_"+str(t.tm_mon)+str(t.tm_mday),"wb")
+		# Sniff until we get a FIN packet
+		try:
+			while True:
+				pkt = sniff(filter="tcp dst port "+str(PORT)+" and ip src host "+self.dst,count=1)[0]
+				if pkt:
+					if pkt[TCP].flags == 1:
+						break
+					else:
+						bytesRecvd += len(pkt.load)
+						f.write(pkt.load)
+		except IndexError:
+			print("Error: Failed to receive packets")
+			f.close()
+			return -1
+		# Handle the Close
+		send(IP(dst=self.dst) / TCP(dport=self.dport,sport=self.sport,flags="A"))
+		self.state = "CLOSE_WAIT"
+		fin = IP(dst=self.dst) / TCP(dport=self.dport,sport=self.sport,flags="F")
+		ack = None
+		while ack == None:
+			self.state = "LAST_ACK"
+			ack = sr1(fin,timeout=0.1,verbose=False)
+			if ack != None:
+				if ack[TCP].flags == 16:
+					self.state == "CLOSED"
+					f.close()
+					if verbose:
+						print("Transfer complete!")
+					return bytesRcvd
+				else:
+					self.state = "CLOSE_WAIT"
+					ack = None
+		f.close()
+		print("Error: Failed to close")
+		return -1
 
 # Function to send the request packet to the FTS
 ## Returns the response packet (type 0x03) if the connection was successful, None otherwise
@@ -222,3 +260,6 @@ def addrValidate(addr):
 		print("Error: Invalid IP Address Format")
 		return False
 	return True
+
+if __name__ == "__main__":
+	h = TCPHandler()

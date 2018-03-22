@@ -1,4 +1,4 @@
-# Python3 Source File for the fileHandler class used to interact with files on the C2 and FSS
+# Python3 Source File for the fileHandler class used to interact with files on the C2
 
 class FileHandler:
 
