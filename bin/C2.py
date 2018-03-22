@@ -4,7 +4,6 @@
 import getopt, sys, os, re
 from scapy.all import *
 file_loc = os.path.dirname(os.path.realpath(__file__)) # Find the directory this file is stored in
-print(file_loc)
 headers_dir = "/".join(file_loc.split("/")[:-1])+"/src/headers"	# Location of the header file
 sys.path.append(headers_dir)
 from packetCrafter import *

@@ -1,18 +1,19 @@
 # Python3 Source File for File Storage Service Main Function
 ## Each FSS instance supports exactly one encoding pattern specified by the user at runtime
 # TODO check permissions, should be run as superuser
-# TODO change directory around to support imports
 # TODO TEST!!!!
-import getopt, sys, socket
-sys.path.append("../src/headers")
+import getopt, sys, socket, os
+file_loc = os.path.dirname(os.path.realpath(__file__))
+headers_dir = "/".join(file_loc.split("/")[:-1])+"/src/headers"
+sys.path.append(headers_dir)
 try:
 	from packetCrafter import *
 	from encoder import *
 	from fileHandler import *
 	from tcpHandler import *
-except ImportError:
-	print("Error: Must be run from projectroot/bin")
-	sys.exit(1)
+except ImportError as err
+	print(err)
+	sys.exit(2)
 
 def main(opts):
 	# Main function
