@@ -6,9 +6,13 @@ from scapy.all import *
 file_loc = os.path.dirname(os.path.realpath(__file__)) # Find the directory this file is stored in
 headers_dir = "/".join(file_loc.split("/")[:-1])+"/src/headers"	# Location of the header file
 sys.path.append(headers_dir)
-from packetCrafter import *
-from fileHandler import *
-from tcpHandler import *
+try:
+	from packetCrafter import *
+	from fileHandler import *
+	from tcpHandler import *
+except ImportError as err:
+	print(err)
+	sys.exit(2)
 
 # Main function
 def main(opts,args):
