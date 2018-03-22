@@ -4,11 +4,60 @@
 #include "CUnit/Basic.h"
 #include "../headers/encoder.c"
 
-int init_suite(void){
+Pattern * full;
+unsigned char * messagesFull;
+Pattern * repeat;
+unsigned char * messagesRepeat;
+
+int init_enc(void){
+	full = calloc(1,sizeof(Pattern));
+	int status = patternValidate(strdup("~:2;^2:2;ror2:2;rol2:2"),full);
+	if (status != 0){
+		printf("FATAL - Failed to validate encoding pattern 'full'\n");
+		exit(1);
+	}
+	messagesFull = calloc(8,sizeof(unsigned char));
+	messagesFull[0] = 0x92;
+	messagesFull[1] = 0x9a;
+	messagesFull[2] = 0x71;
+	messagesFull[3] = 0x71;
+	messagesFull[4] = 0x58;
+	messagesFull[5] = 0xd9;
+	messagesFull[6] = 0x95;
+	messagesFull[7] = 0xcd;
+
+	repeat = calloc(1,sizeof(Pattern));
+	status = patternValidate(strdup("~:2;^2:2"),repeat);
+	if (status != 0){
+		printf("FATAL - Failed to validate encoding pattern 'repeat'\n");
+		exit(1);
+	}
+	messagesRepeat = calloc(8,sizeof(unsigned char));
+	messagesRepeat[0] = 0x92;
+	messagesRepeat[1] = 0x9a;
+	messagesRepeat[2] = 0x71;
+	messagesRepeat[3] = 0x71;
+	messagesRepeat[4] = 0x9e;
+	messagesRepeat[5] = 0x98;
+	messagesRepeat[6] = 0x67;
+	messagesRepeat[7] = 0x71;
+
 	return 0;
 }
 
-int clean_suite(void){
+int clean_enc(void){
+	if (full != NULL){
+		free(full);
+	}
+	if (messagesFull != NULL){
+		free(messagesFull);
+	}
+	if (repeat != NULL){
+		free(repeat);
+	}
+	if (messagesRepeat != NULL){
+		free(messagesRepeat);
+	}
 	return 0;
 }
 
@@ -116,16 +165,36 @@ void testPatternValidate(void){
 	CU_ASSERT(patternValidate(strdup("~:3ror3:4"),parsed) == 1);
 	// fix stdout
 	freopen("/dev/tty","w",stdout);
+	free(parsed);
 }
 
 // Function containing the tests for the encode function
 void testENCODE(void){
-	CU_ASSERT(0 == 0);
+	// Pattern covers the full string and all operations
+	unsigned char * encoded = encode(strdup("messages"),full);
+	CU_ASSERT(memcmp(encoded,messagesFull,8) == 0);
+	// Pattern covers more than the string
+	encoded = encode(strdup("mess"),full);
+	CU_ASSERT(memcmp(encoded,messagesFull,4) == 0);
+	// Pattern repeats
+	encoded = encode(strdup("messages"),repeat);
+	CU_ASSERT(memcmp(encode(strdup("messages"),repeat),messagesRepeat,8) == 0);
 }
 
 // Function containing the tests for the decode function
 void testDECODE(void){
-	CU_ASSERT(0 == 0);
+	// Pattern covers the full string
+	CU_ASSERT(memcmp(decode(messagesFull,full),"messages",8) == 0);
+	// Pattern covers more than the string
+	unsigned char * mess = calloc(4,sizeof(unsigned char));
+	mess[0] = 0x92;
+	mess[1] = 0x9a;
+	mess[2] = 0x71;
+	mess[3] = 0x71;
+	CU_ASSERT(memcmp(decode(mess,full),"mess",4) == 0);
+	// Pattern repeats
+	CU_ASSERT(memcmp(decode(messagesRepeat,repeat),"messages",8) == 0);
+	free(mess);
 }
 
 int main(int argc, char ** argv){
@@ -133,7 +202,7 @@ int main(int argc, char ** argv){
 	if (CUE_SUCCESS != CU_initialize_registry()){
 		return CU_get_error();
 	}
-	encSuite = CU_add_suite("Encoder",init_suite,clean_suite);
+	encSuite = CU_add_suite("Encoder",init_enc,clean_enc);
 	if (NULL == encSuite){
 		CU_cleanup_registry();
 		return CU_get_error();

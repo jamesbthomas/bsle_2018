@@ -151,7 +151,7 @@ unsigned char * encode(char * data,Pattern * parsed){
 	int size = strlen(data)-1;
 	int done = 0;
 	unsigned char * encoded = calloc(size,sizeof(unsigned char));
-	while (currOpt < parsed->numOpts){
+	while (done < size){
 		char opt = parsed->ops[currOpt];
 		int val = parsed->vals[currOpt];
 		int len = parsed->lens[currOpt];
@@ -180,6 +180,9 @@ unsigned char * encode(char * data,Pattern * parsed){
 			done += 1;
 		}
 		currOpt += 1;
+		if (currOpt > parsed->numOpts){
+			currOpt = 0;
+		}
 	}
 	return encoded;
 }
@@ -191,7 +194,7 @@ unsigned char * decode(unsigned char * data,Pattern * parsed){
 	int size = strlen((char *) data)-1;
 	int done = 0;
 	unsigned char * decoded = calloc(size,sizeof(unsigned char));
-	while (currOpt < parsed->numOpts){
+	while (done < size){
 		char opt = parsed->ops[currOpt];
 		int val = parsed->vals[currOpt];
 		int len = parsed->lens[currOpt];
@@ -220,6 +223,9 @@ unsigned char * decode(unsigned char * data,Pattern * parsed){
 			done += 1;
 		}
 		currOpt += 1;
+		if (currOpt > parsed->numOpts){
+			currOpt = 0;
+		}
 	}
 	return decoded;
 }
