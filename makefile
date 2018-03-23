@@ -1,14 +1,17 @@
-RMSRC=rm -f src/sources/*.o
-RMHDR=rm -f src/headers/*.o
-RMTST=rm -f src/testharness/*.o
+RMSRC=-rm -f src/sources/*.o
+RMHDR=-rm -f src/headers/*.o
+RMTST=-rm -f src/testharness/*.o
 TSTDIR=src/testharness/
 SRCDIR=src/sources/
 HDRDIR=src/headers/
+BINDIR=bin/
+MODS=$(SRCDIR)encoder.o
+MAIN=$(SRCDIR)fts.o
+WARN=-Werror -Wall
 
-cleanall:
+cleanAll: clean
 # Removes all object files and binaries
-	rm bin/FTS
-	make clean
+	-rm -f bin/FTS
 
 clean:
 # Removes all object files
@@ -16,18 +19,28 @@ clean:
 	$(RMHDR)
 	$(RMTST)
 
-debug:
+objects:
+	gcc -c $(SRCDIR)encoder.c -o $(SRCDIR)encoder.o $(WARN)
+	gcc -c $(TSTDIR)test.c -o $(TSTDIR)test.o $(WARN) -lcunit
+	gcc -c $(SRCDIR)fts.c -o $(SRCDIR)fts.o $(WARN)	
+
+debug: objects
 # Builds with debugging symbols
-	make install
+	@echo "NOTICE - debugging optimized for GDB"
+	gcc -g -c $(SRCDIR)encoder.c -o $(SRCDIR)encoder.o $(WARN)
+	gcc -g -c $(TSTDIR)test.c -o $(TSTDIR)test.o $(WARN) -lcunit
+	gcc -g -c $(SRCDIR)fts.c -o $(SRCDIR)fts.o $(WARN)
 
-build:
+build: objects
 # Builds without debug information and removes object files
-	make install
-	$(RM)
+	gcc -o $(BINDIR)FTS $(MAIN) $(MODS) $(WARN)
+# Clean 
+	$(RMSRC)
+	$(RMHDR)
+	$(RMTST)
 
-buildAll:
+buildAll: debug
 # Builds with debug information and leaves object files
-	make install
 
 install:
 # Installs applicable external libraries and ensures python3 is available
@@ -36,11 +49,11 @@ install:
 	sudo pip3 install scapy-python3
 	sudo apt-get install libcunit1 libcunit1-doc libcunit1-dev
 
-test:
-	gcc -o $(TSTDIR)test $(TSTDIR)test.c $(SRCDIR)encoder.c -Wall -lcunit
-	## PYTHON TESTS ##
+test: objects
+	gcc -o $(TSTDIR)test $(MODS) $(TSTDIR)test.o $(WARN) -lcunit
+	@echo "#####    PYTHON TESTS    #####"
 	-python3 $(TSTDIR)test.py
-	##    C   TESTS ##
+	@echo "#####       C   TESTS    #####"
 	-$(TSTDIR)test
 
 .PHONY: clean
