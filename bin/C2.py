@@ -1,6 +1,8 @@
 # Source file for C2 Program written in Python3
 # TODO TEST WITH TCPHANDLER!!!
-import getopt, sys, os, re
+import getopt, sys, os, re, logging
+# Keep scapy from throwing annoying warnings
+logging.getLogger("scapy.runtime").setLevel(logging.ERROR)
 from scapy.all import *
 file_loc = os.path.dirname(os.path.realpath(__file__)) # Find the directory this file is stored in
 headers_dir = "/".join(file_loc.split("/")[:-1])+"/src/headers"	# Location of the header file
@@ -16,9 +18,11 @@ except ImportError as err:
 # Main function
 def main(opts,args):
 	print("Starting FTS C2 program...")
+	# Set scapy to work with the loopback address
+	conf.L3socket = L3RawSocket
 
 	# TODO FTS IP address
-	ftsAddr = "10.0.0.2"
+	ftsAddr = "127.0.0.1"
 	# TODO FTS IP Address
 
 	file = None
@@ -90,6 +94,7 @@ def main(opts,args):
 	parts = socket.split(":")
 	addr = parts[0]
 	port = parts[1]
+	crafter = PacketCrafter()
 
 	try:
 		while True:

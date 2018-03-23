@@ -222,22 +222,25 @@ class TCPHandler():
 # Function to send the request packet to the FTS
 ## Returns the response packet (type 0x03) if the connection was successful, None otherwise
 def requestTransfer(addr,port,pattern,phrase,ftsAddr,verbose):
-	crafter = PacketCrafter()
-	requestPacket = crafter.craftRequest(addr,port,pattern,phrase)
-	for ftsPort in range(16000,17001):
-		if ftsPort%100 == 0 and not verbose and ftsPort != 16000:
-			print("Trying to connect... 16000 - ",ftsPort,"unavailable")
-		if verbose:
-			print("Trying port ",ftsPort,". . . ")
-		request = IP(dst=ftsAddr) / UDP(dport=ftsPort) / requestPacket
-		response = sr1(request,timeout=0.1,verbose=False)
-		if response:
-			print("Connection established!")
-			return response
-		if verbose:
-			print("Timed out...")
-
-	return None
+	try:
+		crafter = PacketCrafter()
+		requestPacket = crafter.craftRequest(addr,port,pattern,phrase)
+		for ftsPort in range(16000,16001): #range(16000,17001):
+			if ftsPort%100 == 0 and not verbose and ftsPort != 16000:
+				print("Trying to connect... 16000 - ",ftsPort,"unavailable")
+			if verbose:
+				print("Trying port ",ftsPort,". . . ")
+			request = IP(dst=ftsAddr) / UDP(dport=ftsPort) / requestPacket
+			response = sr1(request,timeout=0.1,verbose=False)
+			if response:
+				print("Connection established!")
+				return response
+			if verbose:
+				print("Timed out...")
+		return None
+	except:
+		print("\nBye!")
+		sys.exit(0);
 
 # Function to validate that a provided IP address is valid
 ## Returns true if valid, false if not

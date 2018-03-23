@@ -5,13 +5,13 @@ TSTDIR=src/testharness/
 SRCDIR=src/sources/
 HDRDIR=src/headers/
 BINDIR=bin/
-MODS=$(SRCDIR)encoder.o
+MODS=$(SRCDIR)encoder.o $(SRCDIR)udpHandler.o
 MAIN=$(SRCDIR)fts.o
 WARN=-Werror -Wall
 
 build: objects
 # Builds without debug information and removes object files
-	gcc -o $(BINDIR)FTS $(MAIN) $(MODS) $(WARN)
+	gcc -o $(BINDIR)FTS $(MAIN) $(MODS) $(WARN) -lpthread
 # Clean 
 	$(RMSRC)
 	$(RMHDR)
@@ -29,18 +29,21 @@ clean:
 
 objects:
 	gcc -c $(SRCDIR)encoder.c -o $(SRCDIR)encoder.o $(WARN)
-	gcc -c $(TSTDIR)test.c -o $(TSTDIR)test.o $(WARN) -lcunit
+	gcc -c $(SRCDIR)udpHandler.c -o $(SRCDIR)udpHandler.o $(WARN)
+	gcc -c $(TSTDIR)test.c -o $(TSTDIR)test.o $(WARN)
 	gcc -c $(SRCDIR)fts.c -o $(SRCDIR)fts.o $(WARN)	
 
-debug: objects
+debug:
 # Builds with debugging symbols
 	@echo "NOTICE - debugging optimized for GDB"
 	gcc -g -c $(SRCDIR)encoder.c -o $(SRCDIR)encoder.o $(WARN)
-	gcc -g -c $(TSTDIR)test.c -o $(TSTDIR)test.o $(WARN) -lcunit
+	gcc -g -c $(SRCDIR)udpHandler.c -o $(SRCDIR)udpHandler.o $(WARN)
+	gcc -g -c $(TSTDIR)test.c -o $(TSTDIR)test.o $(WARN)
 	gcc -g -c $(SRCDIR)fts.c -o $(SRCDIR)fts.o $(WARN)
 
 buildAll: debug
 # Builds with debug information and leaves object files
+	gcc -o $(BINDIR)FTS $(MAIN) $(MODS) $(WARN) -lpthread
 
 install:
 # Installs applicable external libraries and ensures python3 is available

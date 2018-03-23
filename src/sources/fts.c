@@ -8,11 +8,13 @@
 #include <unistd.h>
 #include <errno.h>
 #include <arpa/inet.h>
+#include <pthread.h>
 #include "../headers/encoder.h"
+#include "../headers/udpHandler.h"
 
 #define TOTAL_SOCKETS 1001 // Total number of sockets you want to create, should be (high port) - (low port) + 1
 #define LOW_PORT 16000	// Lowest port to use
-#define TIMEOUT 10	// Timeout value when reading from a socket in microseconds
+#define TIMEOUT 2000	// Timeout value when reading from a socket in microseconds
 #define MAX_SIZE 1450	// Maximum expected message size
 
 int main(int argc, char ** argv){
@@ -57,6 +59,9 @@ int main(int argc, char ** argv){
 	unsigned char * dgram = calloc(MAX_SIZE,sizeof(unsigned char));
 	// Allocate an FD set to keep track of the file descriptor statuses
 	fd_set fds;
+	// Create an array to track the thread IDs
+	pthread_t * tids = calloc(TOTAL_SOCKETS,sizeof(pthread_t));
+	int currThread = 0;
 	while (1) {
 		// Zero out the statuses
 		FD_ZERO(&fds);
@@ -72,15 +77,23 @@ int main(int argc, char ** argv){
 				// Read from the socket
 				struct sockaddr_in from;
 				socklen_t fromLen = sizeof(from);
-				int n = recvfrom(sockets[x],dgram,MAX_SIZE,0,(struct sockaddr *) &from,&fromLen);
-				dgram[n] = '\0';
-				printf("%d - %s\n",sockets[x],dgram);
+				recvfrom(sockets[x],dgram,MAX_SIZE,0,(struct sockaddr *) &from,&fromLen);
+//				dgram[n] = '\0';
 				// Grab info from the packet
 				struct sockaddr_in s;
 				socklen_t len = sizeof(s);
 				getsockname(sockets[x],(struct sockaddr *) &s,&len);
+				session * newSession = calloc(1,sizeof(session));
+				newSession->sport = ntohs(from.sin_port);
+				newSession->dport = ntohs(s.sin_port);
+				newSession->packet = dgram;
+				newSession->saddr = inet_ntoa(from.sin_addr);
 				// Spin off a thread to handle this
-				printf("%d\t%s\n",ntohs(s.sin_port),inet_ntoa(from.sin_addr));
+				pthread_create(&tids[currThread],NULL,startSession,(void *) newSession);
+				currThread += 1;
+				if (currThread > TOTAL_SOCKETS-1){
+					currThread = 0;
+				}
 				// Remove one from the number of sockets we're looking for
 				rcvd -= 1;
 				// If we've found them all, break out and go back to listening
