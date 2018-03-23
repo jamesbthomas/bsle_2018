@@ -9,6 +9,14 @@ MODS=$(SRCDIR)encoder.o
 MAIN=$(SRCDIR)fts.o
 WARN=-Werror -Wall
 
+build: objects
+# Builds without debug information and removes object files
+	gcc -o $(BINDIR)FTS $(MAIN) $(MODS) $(WARN)
+# Clean 
+	$(RMSRC)
+	$(RMHDR)
+	$(RMTST)
+
 cleanAll: clean
 # Removes all object files and binaries
 	-rm -f bin/FTS
@@ -30,14 +38,6 @@ debug: objects
 	gcc -g -c $(SRCDIR)encoder.c -o $(SRCDIR)encoder.o $(WARN)
 	gcc -g -c $(TSTDIR)test.c -o $(TSTDIR)test.o $(WARN) -lcunit
 	gcc -g -c $(SRCDIR)fts.c -o $(SRCDIR)fts.o $(WARN)
-
-build: objects
-# Builds without debug information and removes object files
-	gcc -o $(BINDIR)FTS $(MAIN) $(MODS) $(WARN)
-# Clean 
-	$(RMSRC)
-	$(RMHDR)
-	$(RMTST)
 
 buildAll: debug
 # Builds with debug information and leaves object files
