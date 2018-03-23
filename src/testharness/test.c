@@ -1,8 +1,10 @@
 // C Source File for Testing the FTS Encoder Module
 
 #include <stdio.h>
+#include <stdlib.h>
 #include "CUnit/Basic.h"
-#include "../headers/encoder.c"
+#include "../headers/encoder.h"
+//#include "../sources/encoder.c"
 
 Pattern * full;
 unsigned char * messagesFull;

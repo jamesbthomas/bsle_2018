@@ -1,18 +1,22 @@
 # Unit tests for C2 program using the unittest module
 import sys, unittest, os
 from struct import *
-sys.path.append('../../bin')
-sys.path.append('../headers')
+file_loc = os.path.dirname(os.path.realpath(__file__))
+headers_dir = "/".join(file_loc.split("/")[:-2])+"/src/headers";
+sources_dir = "/".join(file_loc.split("/")[:-2])+"/src/sources";
+bin_dir = "/".join(file_loc.split("/")[:-2])+"/bin";
+sys.path.append(headers_dir)
+sys.path.append(sources_dir)
+sys.path.append(bin_dir)
 # Add the path to C2 to python's path so we can import it here, path addition is volatile
 try:
 	from C2 import socketValidate
 	from packetCrafter import *
 	from encoder import *
 	from fileHandler import *
-except ImportError:
-	print("ERROR: Can only be run from projectroot/src/testharness/")
-	# TODO See if there is a way around this
-	sys.exit(1)
+except ImportError as err:
+	print(err)
+	sys.exit(2)
 
 class DefaultTestCase(unittest.TestCase):
 
@@ -76,30 +80,22 @@ class FileValidateTestCase(DefaultTestCase):
 	def runTest(self):
 		# Known valid files
 		## Relative Path
-		f = self.handler.fileValidate("../../bin/C2.py")
-		self.assertNotEqual(f,None)
-		f.close()
-		f = self.handler.fileValidate("./README.md")
-		self.assertNotEqual(f,None)
-		f.close()
+		self.assertEqual(self.handler.fileValidate(bin_dir+"/C2.py"),True)
+		self.assertEqual(self.handler.fileValidate(headers_dir+"/../sources/README.md"),True)
 		## Absolute Path (Assumes *nix system)
-		f = self.handler.fileValidate("/usr/lib/os-release")
-		self.assertNotEqual(f,None)
-		f.close()
-		f = self.handler.fileValidate("/etc/passwd")
-		self.assertNotEqual(f,None)
-		f.close()
+		self.assertEqual(self.handler.fileValidate("/usr/lib/os-release"),True)
+		self.assertEqual(self.handler.fileValidate("/etc/passwd"),True)
 		# Known invalid files
 		## Relative Path
-		self.assertEqual(self.handler.fileValidate("../../badfile"),None)
-		self.assertEqual(self.handler.fileValidate("../anotherbad"),None)
-		self.assertEqual(self.handler.fileValidate("badhere"),None)
+		self.assertEqual(self.handler.fileValidate("../../badfile"),False)
+		self.assertEqual(self.handler.fileValidate("../anotherbad"),False)
+		self.assertEqual(self.handler.fileValidate("badhere"),False)
 		## Absoluate Path
-		self.assertEqual(self.handler.fileValidate("/etc/badfile"),None)
-		self.assertEqual(self.handler.fileValidate("/home/baddir"),None)
+		self.assertEqual(self.handler.fileValidate("/etc/badfile"),False)
+		self.assertEqual(self.handler.fileValidate("/home/baddir"),False)
 		# Malformed Path
-		self.assertEqual(self.handler.fileValidate(".../."),None)
-		self.assertEqual(self.handler.fileValidate("$/.."),None)
+		self.assertEqual(self.handler.fileValidate(".../."),False)
+		self.assertEqual(self.handler.fileValidate("$/.."),False)
 
 class socketValidateTestCase(DefaultTestCase):
 
@@ -221,8 +217,8 @@ class ContainsTestCase(DefaultTestCase):
 	def runTest(self):
 		self.assertEqual(self.handler.contains("/etc/hosts","127.0.0.1"),"127.0.0.1	localhost\n")
 		self.assertEqual(self.handler.contains("/etc/hosts","::1"),"::1     ip6-localhost ip6-loopback\n")
-		self.assertEqual(self.handler.contains("../headers/packetCrafter.py","this is not there"),None)
-		self.assertEqual(self.handler.contains("../headers/packetCrafter.py","# Python3 Source File"),"# Python3 Source File for the PacketCrafter class used to craft packets for the custom communication protocol and supporting functions\n")
+		self.assertEqual(self.handler.contains(headers_dir+"/packetCrafter.py","this is not there"),None)
+		self.assertEqual(self.handler.contains(headers_dir+"/packetCrafter.py","# Python3 Source File"),"# Python3 Source File for the PacketCrafter class used to craft packets for the custom communication protocol and supporting functions\n")
 		self.assertEqual(self.handler.contains("/etc/hosts",1),"127.0.0.1	localhost\n")
 
 if __name__ == "__main__":

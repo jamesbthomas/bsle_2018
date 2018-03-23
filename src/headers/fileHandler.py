@@ -8,6 +8,7 @@ class FileHandler:
 	def fileValidate(self,path):
 		try:
 			f = open(path,"rb")
+			f.close()
 			return True
 		except FileNotFoundError:
 			print("File not found")

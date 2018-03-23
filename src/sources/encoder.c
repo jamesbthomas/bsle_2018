@@ -6,8 +6,9 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <ctype.h>
+#include "../headers/encoder.h"
 
-typedef struct Patterns {
+typedef struct pattern{
 	int numOpts;
 	int maxOpts;
 	char ** opts;
