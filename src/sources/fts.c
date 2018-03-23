@@ -7,73 +7,88 @@
 #include <netinet/in.h>
 #include <unistd.h>
 #include <errno.h>
+#include <arpa/inet.h>
 #include "../headers/encoder.h"
 
+#define TOTAL_SOCKETS 1001 // Total number of sockets you want to create, should be (high port) - (low port) + 1
+#define LOW_PORT 16000	// Lowest port to use
+#define TIMEOUT 10	// Timeout value when reading from a socket in microseconds
+#define MAX_SIZE 1450	// Maximum expected message size
+
 int main(int argc, char ** argv){
-	struct timeval t;
-	t.tv_sec = 100;
-	fd_set fds;
-	int * sockets = calloc(1000,sizeof(int));
-	for (int i = 0;i < 0;i++){
+	// Create an array to hold the file descriptors
+	int * sockets = calloc(TOTAL_SOCKETS,sizeof(int));
+	// For each socket we want to create
+	for (int i = 0;i < TOTAL_SOCKETS;i++){
+		// Create the file descriptor
 		int fd = socket(AF_INET,SOCK_DGRAM,0);
-		int port = i + 16000;
+		// Calculate the port
+		int port = i + LOW_PORT;
+		// Make sure the socket succeeded
 		if (fd == -1){
-			printf("Error: Failed to Create Socket %d\n",port);
+			perror("Error: Failed to create file descriptor");
 			exit(2);
 		}
+		// Make a struct to contain the address/port for the socket
 		struct sockaddr_in addr;
 		addr.sin_family = AF_INET;
 		addr.sin_port = htons(port);
 		addr.sin_addr.s_addr = INADDR_ANY;
-		if (bind(fd,(struct sockaddr *) &addr,sizeof(addr)) == -1){
-			printf("Error: Failed to Bind Socket %d\n",port);
+		// Create the struct to hold the timeout
+		struct timeval t;
+		t.tv_sec = 0;
+		t.tv_usec = TIMEOUT;
+		// Set the timeout to the socket
+		if (setsockopt(fd,SOL_SOCKET,SO_RCVTIMEO,(char *)&t,sizeof(t)) == -1){
+			perror("Failed to apply timeout");
 			exit(2);
 		}
+		// Bind the file descriptor to the socket address
+		if (bind(fd,(struct sockaddr *) &addr,sizeof(addr)) == -1){
+			perror("Failed to bind");
+			exit(2);
+		}
+		// Add the file descriptor to the array
 		sockets[i] = fd;
-//		setsockopt(fd,SOL_SOCKET,SO_RCVTIMEO,&t,sizeof(t));*/
 	}
+	// track the last created file descriptor
+	int maxfd = sockets[TOTAL_SOCKETS-1];
+	// Allocate a buffer to hold the messages
+	unsigned char * dgram = calloc(MAX_SIZE,sizeof(unsigned char));
+	// Allocate an FD set to keep track of the file descriptor statuses
+	fd_set fds;
 	while (1) {
-		printf("cycle\n");
+		// Zero out the statuses
 		FD_ZERO(&fds);
-		int f = socket(AF_INET,SOCK_DGRAM,0);
-		struct sockaddr_in a;
-		a.sin_family = AF_INET;
-		a.sin_port = htons(16500);
-		a.sin_addr.s_addr = INADDR_ANY;
-		bind(f,(struct sockaddr *) &a,sizeof(a));
-		FD_SET(f,&fds);
-//		for (int i = 0;i < 1000;i++){
-//			printf("%d\t",sockets[i]);
-//			FD_SET(sockets[i],&fds);
-//		}
-		int rcvd = select(4,&fds,NULL,NULL,&t);
-		if (rcvd > 0){
-			unsigned char * buf = calloc(20,sizeof(unsigned char));
-			int n = recvfrom(f,buf,20,0,NULL,NULL);
-			buf[n] = 0;
-			printf("%s\n",buf);
-			free(buf);
-			close(f);
+		// Add each file descriptor to the set
+		for (int i = 0;i < TOTAL_SOCKETS;i++){
+			FD_SET(sockets[i],&fds);
+		}
+		// Scan our sockets and until we get one that is ready
+		int rcvd = select(maxfd+1,&fds,NULL,NULL,NULL);
+		for (int x = 0;x < TOTAL_SOCKETS;x++){
+			// Iterate through all of our sockets and see which one is ready
+			if (FD_ISSET(sockets[x],&fds)){
+				// Read from the socket
+				struct sockaddr_in from;
+				socklen_t fromLen = sizeof(from);
+				int n = recvfrom(sockets[x],dgram,MAX_SIZE,0,(struct sockaddr *) &from,&fromLen);
+				dgram[n] = '\0';
+				printf("%d - %s\n",sockets[x],dgram);
+				// Grab info from the packet
+				struct sockaddr_in s;
+				socklen_t len = sizeof(s);
+				getsockname(sockets[x],(struct sockaddr *) &s,&len);
+				// Spin off a thread to handle this
+				printf("%d\t%s\n",ntohs(s.sin_port),inet_ntoa(from.sin_addr));
+				// Remove one from the number of sockets we're looking for
+				rcvd -= 1;
+				// If we've found them all, break out and go back to listening
+				if (rcvd == 0){
+					break;
+				}
+			}
 		}
 	}
-// Need to close each socket after receiving from it, or test with nc maybe
-// figure out how to manage this for more than one socket
-/*	int currSock = 0;
-	while (1) {
-		unsigned char * buf = calloc(1000,sizeof(unsigned char));
-		struct sockaddr_in s;
-		socklen_t len = sizeof(s);
-		getsockname(sockets[currSock],(struct sockaddr *)&s,&len);
-		int recvd = recvfrom(sockets[currSock],buf,1000,0,NULL,NULL);
-		buf[recvd] = 0;
-		printf("From %d - %s\n",ntohs(s.sin_port),buf);
-		free(buf);
-		currSock += 1;
-	}
-	for (int i = 0; i < 1000;i++){
-		while (close(sockets[i]) != 0){
-			continue;
-		}
-	}*/
 	return 0;
 }
