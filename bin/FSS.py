@@ -79,19 +79,27 @@ def main(opts):
 		sys.exit(2)
 
 	# Find an open TCP Port in the ephemeral range (49152-65535), open the socket to hold the IP address until we're ready to send/sniff
-	sock = None
+	tcpSock = None
+	tcpPort = None
 	for port in range(49152,65536):
-		sock = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
-		result = sock.connect_ex(('localhost',port))
+		tcpSock = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
+		result = tcpSock.connect_ex(('0.0.0.0',port))
 		if result == 0:
+			tcpPort = port
 			break
 
-	if verbose:
-		print("Local Port - "+str(port))
+	if (tcpPort == None):
+		print("Error: Failed to find an open port")
+		sys.exit(0)
 
-	# Craft Packet Type 0x02
-	response = crafter.craftResponse(port,recoded)
-	# TODO send response?
+	# Send the 0x02 packet
+	sock.sendto(b'\x02'+tcpPort.to_bytes(2,byteorder='big')+recoded,(ftsAddr,ftsPort))
+
+	if verbose:
+		print("Local Port - "+str(tcpPort))
+
+	sys.exit(0)
+
 	tcp = TCPHandler(ftsAddr,-1,verbose)
 	# Close socket, send packet, get ready for the shake
 	sock.close()

@@ -130,7 +130,6 @@ void * transferSession(void * in){
         int ftsPort = s->dport;
         char * ctwoAddr = s->saddr;
         int socketsIndex = s->sockNum;
-	printf("%d\t%s\t%d\n",ctwoPort,ctwoAddr,ftsPort);
 	// Close the socket that this packet came in on
 	pthread_mutex_lock(&sockets_lock);
 	int sock = sockets[socketsIndex];
@@ -175,9 +174,9 @@ void * transferSession(void * in){
         // Scrape length of pattern and pattern
         int patternLength = s->packet[8] | s->packet[7] << 8;
         unsigned char * pattern = calloc(patternLength+1,sizeof(unsigned char));
-        int i;
-        for (i = 0;i < patternLength;i++){
-                pattern[i] = s->packet[9+i];
+        int patternSize;
+        for (patternSize = 0;patternSize < patternLength;patternSize++){
+                pattern[patternSize] = s->packet[9+patternSize];
         }
         Pattern * parsed = calloc(1,sizeof(Pattern));
         char * charPattern = calloc(patternLength,sizeof(char *));
@@ -190,24 +189,23 @@ void * transferSession(void * in){
                 return NULL;
         }
         // Scrape initialization message
-        int messageStart = i+9;
-        unsigned char * message = calloc(s->size-(i+9),sizeof(unsigned char));
-	int x;
-        for (x = 0;x < s->size-messageStart;x++){
-                message[x] = s->packet[messageStart+x];
+        int messageStart = patternSize+9;
+        unsigned char * message = calloc(s->size-(patternSize+9),sizeof(unsigned char));
+	int messageLen;
+        for (messageLen = 0;messageLen < s->size-messageStart;messageLen++){
+                message[messageLen] = s->packet[messageStart+messageLen];
         }
-        printf("%s:%d\t%d\t%s\t%s\n",fssAddr,fssPort,messageStart,pattern,message);
         // craft Init
-	unsigned char * init = calloc(1+x,sizeof(unsigned char));
+	unsigned char * init = calloc(1+messageLen,sizeof(unsigned char));
 	init[0] = '1';
 	unsigned char * encoded = encode(message,parsed);
-	memcpy(init+1,encoded,x);
+	memcpy(init+1,encoded,messageLen);
         // Send Init
 	  // setup the destination information
-	struct sockaddr_in dest;
-	dest.sin_family = AF_INET;
-	dest.sin_port = htons(fssPort);
-	if (inet_aton(fssAddr,&(dest.sin_addr)) < 0){
+	struct sockaddr_in fss;
+	fss.sin_family = AF_INET;
+	fss.sin_port = htons(fssPort);
+	if (inet_aton(fssAddr,&(fss.sin_addr)) < 0){
 		// Failed to convert FSS Address
 		pthread_mutex_lock(&sockets_lock);
 		sockets[socketsIndex] = sock;
@@ -215,14 +213,55 @@ void * transferSession(void * in){
 	}
 	 // send the packet
 	int pktSize = (int) strlen((char *) init);
-	while (sendto(sock,init,pktSize,0,(struct sockaddr *) &dest,sizeof(dest)) < pktSize){
+	while (sendto(sock,init,pktSize,0,(struct sockaddr *) &fss,sizeof(fss)) < pktSize){
 		// continue resending until we've sent everything, might introduce a weird bug on the FSS end if it sends some of the packet but not all of it
 		continue;
 	}
-        // TODO receive 0x02, timeout causes thread to exit
+	printf("sent init\n");
+        // Receive 0x02, timeout causes thread to exit
+	unsigned char * response = calloc(MAX_SIZE,sizeof(unsigned char));
+	struct sockaddr_in resp;
+	socklen_t respLen = sizeof(resp);
+	int fails = 0;	// keep track of how many packets come through that aren't responses
+	// protection against someone trying to start a session, hitting this port, and causing the thread to exit before the 0x02 comes in
+	while (fails < 3){
+		int respSize = recvfrom(sock,response,MAX_SIZE,0,(struct sockaddr *) &resp,&respLen);
+		if (respSize == 0 || resp.sin_family != AF_INET || ntohs(fss.sin_port) != ntohs(resp.sin_port) || inet_ntoa(fss.sin_addr) != inet_ntoa(resp.sin_addr) || response[0] != 2){
+			// socket timed out, not from the right source, or not the right packet type
+			response[0] = '\0';
+			fails += 1;
+		}
+		else {
+			break;
+		}
+	}
+	if (fails == 3){
+		// If the loop ended because it failed
+		pthread_mutex_lock(&sockets_lock);
+		sockets[socketsIndex] = sock;
+		pthread_mutex_unlock(&sockets_lock);
+		return NULL;
+	}
+	int tcpPort = response[1] || response[2] << 8;
+	unsigned char * respMessage = calloc(messageLen,sizeof(unsigned char));
+	for (int i = 0;i < messageLen;i++){
+		respMessage[i] = response[i+3];
+	}
+	unsigned char * decoded = decode(respMessage,parsed);
+	if (memcmp(decoded,message,messageLen) != 0){
+		// Decode failure
+		pthread_mutex_lock(&sockets_lock);
+		sockets[socketsIndex] = sock;
+		pthread_mutex_unlock(&sockets_lock);
+		return NULL;
+	}
         // TODO craft 0x03
         // TODO send 0x03
         // TODO start TCP handler
+	printf("%s\t%d\t%d\t%d\n",ctwoAddr,ftsPort,ctwoPort,tcpPort);
 	printf("done\n");
+	pthread_mutex_lock(&sockets_lock);
+	sockets[socketsIndex] = sock;
+	pthread_mutex_unlock(&sockets_lock);
         return NULL;
 }
