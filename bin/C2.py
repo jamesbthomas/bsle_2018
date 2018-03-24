@@ -1,6 +1,6 @@
 # Source file for C2 Program written in Python3
 # TODO TEST WITH TCPHANDLER!!!
-import getopt, sys, os, re, logging
+import getopt, sys, os, re, logging, time
 # Keep scapy from throwing annoying warnings
 logging.getLogger("scapy.runtime").setLevel(logging.ERROR)
 from scapy.all import *
@@ -102,7 +102,7 @@ def main(opts,args):
 
 	try:
 		while True:
-			response = requestTransfer(addr,fssPort,pattern,phrase,ftsAddr,localPort,verbose)
+			response, ftsPort = requestTransfer(addr,fssPort,pattern,phrase,ftsAddr,localPort,verbose)
 			if response != None:
 				break
 			elif not interactive:
@@ -127,32 +127,30 @@ def main(opts,args):
 
 	# Extract TCP port and verify validation message
 	tcpPort = crafter.unpackValidation(response,phrase)
-	print(tcpPort)
-	sys.exit(0)
 	if not tcpPort:
 		sys.exit(3)
 
+	# Add a now valid FSS to the whitelist
 	if not handler.contains(file_loc+"/IPAddWhiteList",addr):
 		if handler.add(file_loc+"/IPAddWhiteList",addr+","+fssPort+","+pattern) != len(addr+","+fssPort+","+pattern+"\n"):
 			print("Error: Internal - Failed to add to IPAddWhiteList")
 			sys.exit(2)
 
 	# Data Transfer
-	tcp = TCPHandler()
+	tcp = TCPHandler(ftsAddr,tcpPort,verbose)
 		## TCP Three-way Handshake
-	if not handshake(verbose):
+	if not tcp.handshake(file):
 		print("Error: TCP Handshake Failed")
 		sys.exit(4)
-		## Data transfer
+
+	## Data transfer
 	fsize = os.stat(file).st_size
-	if sendFile(file,fsize,verbose) != fsize:
+	if tcp.sendFile(file,fsize) != fsize:
 		print("WARNING: Total bytes sent does not match file size")
-		## TCP Close
-	try:
-		while not close(verbose):
-			print("Retrying close...")
-	except KeyboardInterrupt:
-		print("WARNING: Exiting without closing TCP Connection")
+	## TCP Close
+	tcp.socket.close()
+
+	time.sleep(1000)
 
 	print("Bye!")
 	return 0

