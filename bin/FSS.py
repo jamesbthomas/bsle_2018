@@ -105,8 +105,13 @@ def main(opts):
 				sys.exit(0)
 
 			# Receive the file
-			if tcp.recvFile(s) < 1:
+			rcvd = tcp.recvFile(s)
+			if rcvd < 1:
+				print("Receive Failure")
 				sys.exit(2)
+
+			if verbose:
+				print("File Received - Wrote "+str(rcvd)+" bytes")
 			print("Bye!")
 			sys.exit(0)
 	except KeyboardInterrupt:

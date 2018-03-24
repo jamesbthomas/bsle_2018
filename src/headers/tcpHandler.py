@@ -49,15 +49,19 @@ class TCPHandler():
 		bytesRcvd = 0
 		t = time.localtime()
 		f = open(str(t.tm_hour)+str(t.tm_min)+"-"+str(t.tm_mon)+str(t.tm_mday),"wb")
+		total = 0
 		pkt = sock.recv(1450)
 		try:
 			while(pkt != b''):
+				total += len(pkt)
 				f.write(pkt)
 				pkt = sock.recv(1450)
 		except socket.timeout:
 			pass
+		except:
+			return -1
 		f.close()
-		return 0
+		return total
 
 # Function to send the request packet to the FTS
 ## Returns the response packet (type 0x03) if the connection was successful, None otherwise
