@@ -99,13 +99,10 @@ def main(opts,args):
 	addr = parts[0]
 	fssPort = parts[1]
 	crafter = PacketCrafter()
-	sock = makeUDP(localPort,True)
-	if (sock == None):
-		sys.exit(2)
 
 	try:
 		while True:
-			response = requestTransfer(addr,fssPort,pattern,phrase,ftsAddr,sock,verbose)
+			response = requestTransfer(addr,fssPort,pattern,phrase,ftsAddr,localPort,verbose)
 			if response != None:
 				break
 			elif not interactive:
@@ -130,7 +127,7 @@ def main(opts,args):
 
 	# Extract TCP port and verify validation message
 	tcpPort = crafter.unpackValidation(response,phrase)
-	print(sock)
+	print(tcpPort)
 	sys.exit(0)
 	if not tcpPort:
 		sys.exit(3)

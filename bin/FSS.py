@@ -48,72 +48,78 @@ def main(opts):
 
 	encoder = Encoder(pattern)
 
+	sock = makeUDP(port,False);
+	if (sock == None):
+		sys.exit(2)
+
 	try:
-		sock = makeUDP(port,False);
-		if (sock == None):
-			sys.exit(2)
-		message = None
-		while message == None:
-			message, (ftsAddr,ftsPort)  = sock.recvfrom(1450)
-			if (message[0] != 0x31):
-				message == None
-				continue
+		while True:
+			try:
+				message = None
+				while message == None:
+					message, (ftsAddr,ftsPort)  = sock.recvfrom(1450)
+					if (message[0] != 0x31):
+						message == None
+						continue
+					if verbose:
+						print("Received message from {0}:{1} - {2}".format(ftsAddr,ftsPort,message))
+			except KeyboardInterrupt: # Round-about way to keyboard interrupt the sniff
+				# CTRL+C will stop sniff but not throw the Interrupt into the main thread
+				# If you CTRL+C, then it will IndexError when trying to index into the packets that were sniffed
+				print("\nBye!")
+				sys.exit(0)
+
+			decoded = encoder.decode(message[1:]) # self.plainBytes.decode() utf-8 cant decode 0x8f in position 0
+			if (decoded == None):
+				print("Error: Could not decode message")
+				sys.exit(2)
+			recoded = encoder.encode(decoded)
 			if verbose:
-				print("Received message from {0}:{1} - {2}".format(ftsAddr,ftsPort,message))
-	except KeyboardInterrupt: # Round-about way to keyboard interrupt the sniff
-		# CTRL+C will stop sniff but not throw the Interrupt into the main thread
-		# If you CTRL+C, then it will IndexError when trying to index into the packets that were sniffed
+				print(message[1:],"->",decoded,"->",recoded)
+
+			if message[1:] != recoded:
+				print("Error: Decode/Recode Failure")
+				sys.exit(2)
+
+			# Find an open TCP Port in the ephemeral range (49152-65535), open the socket to hold the IP address until we're ready to send/sniff
+			tcpSock = None
+			tcpPort = None
+			for port in range(49152,65536):
+				tcpSock = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
+				result = tcpSock.connect_ex(('0.0.0.0',port))
+				if result == 0:
+					tcpPort = port
+					break
+
+			if (tcpPort == None):
+				print("Error: Failed to find an open port")
+				sys.exit(0)
+
+			# Send the 0x02 packet
+			sock.sendto(b'\x02'+tcpPort.to_bytes(2,byteorder='big')+recoded,(ftsAddr,ftsPort))
+
+			if verbose:
+				print("Local Port - "+str(tcpPort))
+
+			# TODO TCP transmission
+			continue
+
+			tcp = TCPHandler(ftsAddr,-1,verbose)
+			# Close socket, send packet, get ready for the shake
+			sock.close()
+			ready = False
+			while not ready:
+				ready,path = tcp.shake(port)
+			# Receive the file
+			if verbose:
+				print("Waiting for file...")
+			if tcp.recvFile(path) < 1:
+				sys.exit(2)
+			print("Bye!")
+			sys.exit(0)
+	except KeyboardInterrupt:
 		print("\nBye!")
 		sys.exit(0)
-
-	decoded = encoder.decode(message[1:]) # self.plainBytes.decode() utf-8 cant decode 0x8f in position 0
-	if (decoded == None):
-		print("Error: Could not decode message")
-		sys.exit(2)
-	recoded = encoder.encode(decoded)
-	if verbose:
-		print(message[1:],"->",decoded,"->",recoded)
-
-	if message[1:] != recoded:
-		print("Error: Decode/Recode Failure")
-		sys.exit(2)
-
-	# Find an open TCP Port in the ephemeral range (49152-65535), open the socket to hold the IP address until we're ready to send/sniff
-	tcpSock = None
-	tcpPort = None
-	for port in range(49152,65536):
-		tcpSock = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
-		result = tcpSock.connect_ex(('0.0.0.0',port))
-		if result == 0:
-			tcpPort = port
-			break
-
-	if (tcpPort == None):
-		print("Error: Failed to find an open port")
-		sys.exit(0)
-
-	# Send the 0x02 packet
-	sock.sendto(b'\x02'+tcpPort.to_bytes(2,byteorder='big')+recoded,(ftsAddr,ftsPort))
-
-	if verbose:
-		print("Local Port - "+str(tcpPort))
-
-	# TODO TCP transmission
-	sys.exit(0)
-
-	tcp = TCPHandler(ftsAddr,-1,verbose)
-	# Close socket, send packet, get ready for the shake
-	sock.close()
-	ready = False
-	while not ready:
-		ready,path = tcp.shake(port)
-	# Receive the file
-	if verbose:
-		print("Waiting for file...")
-	if tcp.recvFile(path) < 1:
-		sys.exit(2)
-	print("Bye!")
-	sys.exit(0)
 
 # Function to print usage information
 def usage():

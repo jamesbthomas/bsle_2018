@@ -117,7 +117,7 @@ def makeUDP(port,timeout):
 		sock = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
 		sock.bind(('0.0.0.0',port))
 		if timeout:
-			sock.settimeout(0.003)
+			sock.settimeout(0.1)
 		return sock
 	except socket.error as err:
 		print("Error: Failed to create UDP socket - "+err)

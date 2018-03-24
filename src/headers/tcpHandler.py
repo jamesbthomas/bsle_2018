@@ -221,8 +221,9 @@ class TCPHandler():
 
 # Function to send the request packet to the FTS
 ## Returns the response packet (type 0x03) if the connection was successful, None otherwise
-def requestTransfer(addr,port,pattern,phrase,ftsAddr,sock,verbose):
+def requestTransfer(addr,port,pattern,phrase,ftsAddr,localport,verbose):
 	try:
+		sock = makeUDP(localport,True)
 		crafter = PacketCrafter()
 		requestPacket = crafter.craftRequest(addr,port,pattern,phrase)
 		for ftsPort in range(16000,16001): #range(16000,17001):
@@ -238,10 +239,10 @@ def requestTransfer(addr,port,pattern,phrase,ftsAddr,sock,verbose):
 			phraseBytes = bytes(phrase,'us-ascii')
 			sock.sendto(b'\x00'+addrBytes+portBytes+lenBytes+patternBytes+phraseBytes,(ftsAddr,ftsPort))
 	# TODO fix this, always breaks on the first try and leaves bits on the socket
-		## in this config, doesnt read from the socket at all
-			if (select.select([sock],[],[],0.002) == None,None,None):
-				continue
-			response,(respAddr,respPort) = sock.recvfrom(1450)
+			try:
+				response,(respAddr,respPort) = sock.recvfrom(1450)
+			except socket.timeout:
+				time.sleep(1000)
 			if ((respAddr != addr) or (respPort != ftsPort)):
 				continue
 			if response:
