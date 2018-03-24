@@ -173,14 +173,14 @@ void testPatternValidate(void){
 // Function containing the tests for the encode function
 void testENCODE(void){
 	// Pattern covers the full string and all operations
-	unsigned char * encoded = encode(strdup("messages"),full);
+	unsigned char * encoded = encode((unsigned char *) strdup("messages"),full);
 	CU_ASSERT(memcmp(encoded,messagesFull,8) == 0);
 	// Pattern covers more than the string
-	encoded = encode(strdup("mess"),full);
+	encoded = encode((unsigned char *) strdup("mess"),full);
 	CU_ASSERT(memcmp(encoded,messagesFull,4) == 0);
 	// Pattern repeats
-	encoded = encode(strdup("messages"),repeat);
-	CU_ASSERT(memcmp(encode(strdup("messages"),repeat),messagesRepeat,8) == 0);
+	encoded = encode((unsigned char *) strdup("messages"),repeat);
+	CU_ASSERT(memcmp(encoded,messagesRepeat,8) == 0);
 }
 
 // Function containing the tests for the decode function

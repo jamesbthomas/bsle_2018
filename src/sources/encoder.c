@@ -147,9 +147,9 @@ unsigned char rol(const unsigned char value, int shift){
 
 // Function to encode a string using a provided parsed encoding pattern
 // Returns encoded string if successful, NULL otherwise
-unsigned char * encode(char * data,Pattern * parsed){
+unsigned char * encode(unsigned char * data,Pattern * parsed){
 	int currOpt = 0;
-	int size = strlen(data)-1;
+	int size = strlen((char *) data)-1;
 	int done = 0;
 	unsigned char * encoded = calloc(size,sizeof(unsigned char));
 	while (done < size){

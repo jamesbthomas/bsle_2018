@@ -50,31 +50,38 @@ def main(opts):
 	encoder = Encoder(pattern)
 
 	try:
+		sock = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
+		sock.bind(("0.0.0.0",port))
 		message = None
 		while message == None:
-			init = sniff(filter="udp dst port "+str(port),count=1)[0]
-			message,ftsAddr,ftsPort = crafter.unpackInit(init)
+			message, (ftsAddr,ftsPort)  = sock.recvfrom(30)
+			if (message[0] != 0x31):
+				message == None
+				continue
 			if verbose:
 				print("Received message from {0}:{1} - {2}".format(ftsAddr,ftsPort,message))
-	except IndexError: # Round-about way to keyboard interrupt the sniff
+	except KeyboardInterrupt: # Round-about way to keyboard interrupt the sniff
 		# CTRL+C will stop sniff but not throw the Interrupt into the main thread
 		# If you CTRL+C, then it will IndexError when trying to index into the packets that were sniffed
 		print("\nBye!")
 		sys.exit(0)
 
-	decoded = encoder.decode(message) # self.plainBytes.decode() utf-8 cant decode 0x8f in position 0
+	decoded = encoder.decode(message[1:]) # self.plainBytes.decode() utf-8 cant decode 0x8f in position 0
+	if (decoded == None):
+		print("Error: Could not decode message")
+		sys.exit(2)
 	recoded = encoder.encode(decoded)
 	if verbose:
-		print(message+" -> "+decoded+" -> "+recoded)
+		print(message[1:],"->",decoded,"->",recoded)
 
-	if message != decoded:
+	if message[1:] != recoded:
 		print("Error: Decode/Recode Failure")
 		sys.exit(2)
 
 	# Find an open TCP Port in the ephemeral range (49152-65535), open the socket to hold the IP address until we're ready to send/sniff
 	sock = None
 	for port in range(49152,65536):
-		sock = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+		sock = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
 		result = sock.connect_ex(('localhost',port))
 		if result == 0:
 			break
@@ -84,6 +91,7 @@ def main(opts):
 
 	# Craft Packet Type 0x02
 	response = crafter.craftResponse(port,recoded)
+	# TODO send response?
 	tcp = TCPHandler(ftsAddr,-1,verbose)
 	# Close socket, send packet, get ready for the shake
 	sock.close()

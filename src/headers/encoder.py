@@ -115,8 +115,12 @@ class Encoder:
 						numOps += 1
 			except IndexError:
 				break
-		self.plain = self.plainBytes.decode()
-		return self.plain
+		try:
+			self.plain = self.plainBytes.decode()
+			return self.plain
+		except UnicodeDecodeError as err:
+			print(err)
+			return None
 
 # Used for dev testing
 if __name__ == "__main__":

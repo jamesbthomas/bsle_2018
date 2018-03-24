@@ -11,7 +11,7 @@ WARN=-Werror -Wall
 
 build: objects
 # Builds without debug information and removes object files
-	gcc -o $(BINDIR)FTS $(MAIN) $(MODS) $(WARN) -lpthread
+	-gcc -o $(BINDIR)FTS $(MAIN) $(MODS) $(WARN) -lpthread
 # Clean 
 	$(RMSRC)
 	$(RMHDR)
@@ -28,22 +28,22 @@ clean:
 	$(RMTST)
 
 objects:
-	gcc -c $(SRCDIR)encoder.c -o $(SRCDIR)encoder.o $(WARN)
-	gcc -c $(SRCDIR)sessionHandler.c -o $(SRCDIR)sessionHandler.o $(WARN)
-	gcc -c $(TSTDIR)test.c -o $(TSTDIR)test.o $(WARN)
-	gcc -c $(SRCDIR)fts.c -o $(SRCDIR)fts.o $(WARN)	
+	-gcc -c $(SRCDIR)encoder.c -o $(SRCDIR)encoder.o $(WARN)
+	-gcc -c $(SRCDIR)sessionHandler.c -o $(SRCDIR)sessionHandler.o $(WARN)
+	-gcc -c $(TSTDIR)test.c -o $(TSTDIR)test.o $(WARN)
+	-gcc -c $(SRCDIR)fts.c -o $(SRCDIR)fts.o $(WARN)	
 
 debug:
 # Builds with debugging symbols
 	@echo "NOTICE - debugging optimized for GDB"
-	gcc -g -c $(SRCDIR)encoder.c -o $(SRCDIR)encoder.o $(WARN)
-	gcc -g -c $(SRCDIR)sessionHandler.c -o $(SRCDIR)sessionHandler.o $(WARN)
-	gcc -g -c $(TSTDIR)test.c -o $(TSTDIR)test.o $(WARN)
-	gcc -g -c $(SRCDIR)fts.c -o $(SRCDIR)fts.o $(WARN)
+	-gcc -g -c $(SRCDIR)encoder.c -o $(SRCDIR)encoder.o $(WARN)
+	-gcc -g -c $(SRCDIR)sessionHandler.c -o $(SRCDIR)sessionHandler.o $(WARN)
+	-gcc -g -c $(TSTDIR)test.c -o $(TSTDIR)test.o $(WARN)
+	-gcc -g -c $(SRCDIR)fts.c -o $(SRCDIR)fts.o $(WARN)
 
 buildAll: debug
 # Builds with debug information and leaves object files
-	gcc -o $(BINDIR)FTS $(MAIN) $(MODS) $(WARN) -lpthread
+	-gcc -o $(BINDIR)FTS $(MAIN) $(MODS) $(WARN) -lpthread
 
 install:
 # Installs applicable external libraries and ensures python3 is available

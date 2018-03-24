@@ -19,7 +19,6 @@
 #define MAX_SIZE 1450	// Maximum expected message size
 
 void * transferSession(void * in);
-int restartSocket(int index,int port);
 
 pthread_mutex_t sockets_lock;
 int * sockets;
@@ -137,15 +136,12 @@ void * transferSession(void * in){
 	int sock = sockets[socketsIndex];
 	sockets[socketsIndex] = 0;
 	pthread_mutex_unlock(&sockets_lock);
-	shutdown(sock,SHUT_RDWR);
-	close(sock);
-	errno = 0;
         // Verify this is the right packet type
         if (s->packet[0] != 0){
                 // Not packet type 0x00
-		while (restartSocket(socketsIndex,ftsPort) == 0){
-			continue;
-		}
+		pthread_mutex_lock(&sockets_lock);
+		sockets[socketsIndex] = sock;
+		pthread_mutex_unlock(&sockets_lock);
                 return NULL;
         }
         // Scrape the address of the FSS
@@ -153,27 +149,27 @@ void * transferSession(void * in){
         for (int i = 1;i < 5;i++){
                 if (s->packet[i] < 0 || s->packet[i] > 255){
                         // Invalid octet
-			while (restartSocket(socketsIndex,ftsPort) == 0){
-				continue;
-			}
+			pthread_mutex_lock(&sockets_lock);
+			sockets[socketsIndex] = sock;
+			pthread_mutex_unlock(&sockets_lock);
                         return NULL;
                 }
         }
         sprintf(fssAddr,"%d.%d.%d.%d",s->packet[1],s->packet[2],s->packet[3],s->packet[4]);
         if (strncmp(fssAddr,"0.0.0.0",strlen(fssAddr)) == 0 || strncmp(fssAddr,"255.255.255.255",strlen(fssAddr)) == 0){
                 // Invalid IP address, won't send to broadcast
-		while (restartSocket(socketsIndex,ftsPort) == 0){
-			continue;
-		}
+		pthread_mutex_lock(&sockets_lock);
+		sockets[socketsIndex] = sock;
+		pthread_mutex_unlock(&sockets_lock);
                 return NULL;
         }
         // Scrape FSS Port
         int fssPort = s->packet[6] | s->packet[5] << 8;
         if (fssPort < 1 || fssPort > 65535){
                 // Invalid port number
-		while (restartSocket(socketsIndex,ftsPort) == 0){
-			continue;
-		}
+		pthread_mutex_lock(&sockets_lock);
+		sockets[socketsIndex] = sock;
+		pthread_mutex_unlock(&sockets_lock);
                 return NULL;
         }
         // Scrape length of pattern and pattern
@@ -188,9 +184,9 @@ void * transferSession(void * in){
         sprintf(charPattern,"%s",pattern);
         if (patternValidate(charPattern,parsed) != 0){
                 // Invalid pattern
-		while (restartSocket(socketsIndex,ftsPort) == 0){
-			continue;
-		}
+		pthread_mutex_lock(&sockets_lock);
+		sockets[socketsIndex] = sock;
+		pthread_mutex_unlock(&sockets_lock);
                 return NULL;
         }
         // Scrape initialization message
@@ -204,55 +200,22 @@ void * transferSession(void * in){
         // craft Init
 	unsigned char * init = calloc(1+x,sizeof(unsigned char));
 	init[0] = '1';
-	memcpy(init+1,message,x);
+	unsigned char * encoded = encode(message,parsed);
+	memcpy(init+1,encoded,x);
         // Send Init
-	  // Create a new socket on this port
-	  // necessary to avoid getting a bunch of different threads on the same port at the same time
-	  // closing the port and taking it out of sockets[] keeps main from scanning it for activity
-        int fssSocket = socket(AF_INET,SOCK_DGRAM,0);
-        if (fssSocket == -1){
-                // Failed to open
-		while (restartSocket(socketsIndex,ftsPort) == 0){
-			continue;
-		}
-                return NULL;
-        }
-        struct sockaddr_in addr;
-        addr.sin_family = AF_INET;
-        addr.sin_port = htons(ftsPort);
-	addr.sin_addr.s_addr = INADDR_ANY;
-        struct timeval t;
-        t.tv_usec = TIMEOUT;
-        if (setsockopt(fssSocket,SOL_SOCKET,SO_RCVTIMEO,(char *) &t,sizeof(t)) == -1){
-                // Failed to set timeout
-		close(fssSocket);
-		while (restartSocket(socketsIndex,ftsPort) == 0){
-			continue;
-		}
-                return NULL;
-        }
-        if (bind(fssSocket,(struct sockaddr *) &addr,sizeof(addr)) == -1){
-                // Failed to bind
-		close(fssSocket);
-		while (restartSocket(socketsIndex,ftsPort) == 0){
-			continue;
-		}
-                return NULL;
-        }
 	  // setup the destination information
 	struct sockaddr_in dest;
 	dest.sin_family = AF_INET;
 	dest.sin_port = htons(fssPort);
 	if (inet_aton(fssAddr,&(dest.sin_addr)) < 0){
-		close(fssSocket);
-		while(restartSocket(socketsIndex,ftsPort) == 0){
-			continue;
-		}
-		return NULL;
+		// Failed to convert FSS Address
+		pthread_mutex_lock(&sockets_lock);
+		sockets[socketsIndex] = sock;
+		pthread_mutex_unlock(&sockets_lock);
 	}
 	 // send the packet
 	int pktSize = (int) strlen((char *) init);
-	while (sendto(fssSocket,init,pktSize,0,(struct sockaddr *) &dest,sizeof(dest)) < pktSize){
+	while (sendto(sock,init,pktSize,0,(struct sockaddr *) &dest,sizeof(dest)) < pktSize){
 		// continue resending until we've sent everything, might introduce a weird bug on the FSS end if it sends some of the packet but not all of it
 		continue;
 	}
@@ -260,49 +223,6 @@ void * transferSession(void * in){
         // TODO craft 0x03
         // TODO send 0x03
         // TODO start TCP handler
-        close(fssSocket);
-	// Remage the socket
-	while (restartSocket(socketsIndex,ftsPort) == 0){
-		continue;
-	}
 	printf("done\n");
         return NULL;
-}
-
-// Function to restart a socket once a thread has reached the end of its execution
-// Returns 1 on success, 0 if error
-// Duplicated outside of main to allow main to provide more verbose output
-// This should only be called from a child thread, so getting output from this is not as important as getting it from main
-int restartSocket(int index,int port){
-	// Verify that inputs are within the acceptable range
-	if (port < 1 || port > 65535){
-		return 0;
-	}
-	if (index < 0 || index > TOTAL_SOCKETS-2){
-		return 0;
-	}
-	// remake the file descriptor
-	int fd = socket(AF_INET,SOCK_DGRAM,0);
-	if (fd == -1){
-		return 0;
-	}
-	// set timeout
-	struct timeval t;
-	t.tv_usec = TIMEOUT;
-	if (setsockopt(fd,SOL_SOCKET,SO_RCVTIMEO,(char *) &t,sizeof(t)) == -1){
-		return 0;
-	}
-	// bind
-	struct sockaddr_in addr;
-	addr.sin_family = AF_INET;
-	addr.sin_port = htons(port);
-	addr.sin_addr.s_addr = INADDR_ANY;
-	if (bind(fd,(struct sockaddr *) &addr,sizeof(addr)) == -1){
-		return 0;
-	}
-	// add FD to sockets[]
-	pthread_mutex_lock(&sockets_lock);
-	sockets[index] = fd;
-	pthread_mutex_unlock(&sockets_lock);
-	return 1;
 }

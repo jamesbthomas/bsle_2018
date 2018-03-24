@@ -16,7 +16,7 @@ int patternValidate(char * pattern,Pattern * parsed);
 unsigned char ror(const unsigned char value, int shift);
 unsigned char rol(const unsigned char value, int shift);
 
-unsigned char * encode(char * data,Pattern * parsed);
+unsigned char * encode(unsigned char * data,Pattern * parsed);
 unsigned char * decode(unsigned char * data, Pattern * parsed);
 
 #endif

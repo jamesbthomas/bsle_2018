@@ -13,7 +13,7 @@ class TCPHandler():
 		self.dst = dst
 		self.dport = dport
 		self.sport = None
-		self.seq = randint(0,2147483647)
+		self.seq = random.randint(0,2147483647)
 		self.lastSeq = 0
 		self.nextSeq = 0
 		self.state = "init"
