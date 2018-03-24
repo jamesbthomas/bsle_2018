@@ -5,7 +5,7 @@ TSTDIR=src/testharness/
 SRCDIR=src/sources/
 HDRDIR=src/headers/
 BINDIR=bin/
-MODS=$(SRCDIR)encoder.o $(SRCDIR)udpHandler.o
+MODS=$(SRCDIR)encoder.o $(SRCDIR)sessionHandler.o
 MAIN=$(SRCDIR)fts.o
 WARN=-Werror -Wall
 
@@ -29,7 +29,7 @@ clean:
 
 objects:
 	gcc -c $(SRCDIR)encoder.c -o $(SRCDIR)encoder.o $(WARN)
-	gcc -c $(SRCDIR)udpHandler.c -o $(SRCDIR)udpHandler.o $(WARN)
+	gcc -c $(SRCDIR)sessionHandler.c -o $(SRCDIR)sessionHandler.o $(WARN)
 	gcc -c $(TSTDIR)test.c -o $(TSTDIR)test.o $(WARN)
 	gcc -c $(SRCDIR)fts.c -o $(SRCDIR)fts.o $(WARN)	
 
@@ -37,7 +37,7 @@ debug:
 # Builds with debugging symbols
 	@echo "NOTICE - debugging optimized for GDB"
 	gcc -g -c $(SRCDIR)encoder.c -o $(SRCDIR)encoder.o $(WARN)
-	gcc -g -c $(SRCDIR)udpHandler.c -o $(SRCDIR)udpHandler.o $(WARN)
+	gcc -g -c $(SRCDIR)sessionHandler.c -o $(SRCDIR)sessionHandler.o $(WARN)
 	gcc -g -c $(TSTDIR)test.c -o $(TSTDIR)test.o $(WARN)
 	gcc -g -c $(SRCDIR)fts.c -o $(SRCDIR)fts.o $(WARN)
 

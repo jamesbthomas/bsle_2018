@@ -31,7 +31,7 @@ class PacketCrafter:
 		# Unpack Packet Type 0x01
 		# Verifies packet type and returns the encoded initialization message, or None if error
 		# TODO find a way to automate testing this, see unpackResponse
-		if (int(pkt.load[0]) != 1):
+		if (int(pkt.load[0]) != 49): # dec 49 = ascii 1
 			print("Error: Invalid Packet Type")
 			return None
 		return pkt.load[1:],pkt[IP].src,pkt[UDP].sport

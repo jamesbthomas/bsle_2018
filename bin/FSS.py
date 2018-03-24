@@ -55,16 +55,14 @@ def main(opts):
 			init = sniff(filter="udp dst port "+str(port),count=1)[0]
 			message,ftsAddr,ftsPort = crafter.unpackInit(init)
 			if verbose:
-				print("Received message from "+ftsAddr+":"+str(ftsPort)+" - "+message)
-		while True:
-			pass
+				print("Received message from {0}:{1} - {2}".format(ftsAddr,ftsPort,message))
 	except IndexError: # Round-about way to keyboard interrupt the sniff
 		# CTRL+C will stop sniff but not throw the Interrupt into the main thread
 		# If you CTRL+C, then it will IndexError when trying to index into the packets that were sniffed
 		print("\nBye!")
 		sys.exit(0)
 
-	decoded = encoder.decode(message)
+	decoded = encoder.decode(message) # self.plainBytes.decode() utf-8 cant decode 0x8f in position 0
 	recoded = encoder.encode(decoded)
 	if verbose:
 		print(message+" -> "+decoded+" -> "+recoded)

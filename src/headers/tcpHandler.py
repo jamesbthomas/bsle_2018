@@ -230,7 +230,7 @@ def requestTransfer(addr,port,pattern,phrase,ftsAddr,verbose):
 				print("Trying to connect... 16000 - ",ftsPort,"unavailable")
 			if verbose:
 				print("Trying port ",ftsPort,". . . ")
-			request = IP(dst=ftsAddr) / UDP(dport=ftsPort) / requestPacket
+			request = IP(dst=ftsAddr) / UDP(sport=65534,dport=ftsPort) / requestPacket
 			response = sr1(request,timeout=0.1,verbose=False)
 			if response:
 				print("Connection established!")
