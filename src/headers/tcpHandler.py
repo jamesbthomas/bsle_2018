@@ -1,5 +1,5 @@
 # Python3 Source File for the TCPHandler Class designed to handle sending and receiving TCP packets and associated functions to assist with handling packets
-import re, random, os, time
+import re, random, os, time, select
 from scapy.all import *
 from encoder import *
 from packetCrafter import *
@@ -221,7 +221,7 @@ class TCPHandler():
 
 # Function to send the request packet to the FTS
 ## Returns the response packet (type 0x03) if the connection was successful, None otherwise
-def requestTransfer(addr,port,pattern,phrase,ftsAddr,verbose):
+def requestTransfer(addr,port,pattern,phrase,ftsAddr,sock,verbose):
 	try:
 		crafter = PacketCrafter()
 		requestPacket = crafter.craftRequest(addr,port,pattern,phrase)
@@ -230,16 +230,28 @@ def requestTransfer(addr,port,pattern,phrase,ftsAddr,verbose):
 				print("Trying to connect... 16000 - ",ftsPort,"unavailable")
 			if verbose:
 				print("Trying port ",ftsPort,". . . ")
-			request = IP(dst=ftsAddr) / UDP(sport=65534,dport=ftsPort) / requestPacket
-			response = sr1(request,timeout=0.1,verbose=False)
+#			request = IP(dst=ftsAddr) / UDP(sport=65534,dport=ftsPort) / requestPacket
+			addrBytes = crafter.convertAddr(addr).to_bytes(4,byteorder='big')
+			portBytes = int(port).to_bytes(2,byteorder='big')
+			lenBytes = len(pattern).to_bytes(2,byteorder='big')
+			patternBytes = bytes(pattern,'us-ascii')
+			phraseBytes = bytes(phrase,'us-ascii')
+			sock.sendto(b'\x00'+addrBytes+portBytes+lenBytes+patternBytes+phraseBytes,(ftsAddr,ftsPort))
+	# TODO fix this, always breaks on the first try and leaves bits on the socket
+		## in this config, doesnt read from the socket at all
+			if (select.select([sock],[],[],0.002) == None,None,None):
+				continue
+			response,(respAddr,respPort) = sock.recvfrom(1450)
+			if ((respAddr != addr) or (respPort != ftsPort)):
+				continue
 			if response:
 				print("Connection established!")
 				return response
 			if verbose:
 				print("Timed out...")
 		return None
-	except:
-		print("\nBye!")
+	except Exception as err:
+		print(err+"\nBye!")
 		sys.exit(0);
 
 # Function to validate that a provided IP address is valid

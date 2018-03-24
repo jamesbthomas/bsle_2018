@@ -1,6 +1,5 @@
 # Python3 Source File for File Storage Service Main Function
 ## Each FSS instance supports exactly one encoding pattern specified by the user at runtime
-# TODO check permissions, should be run as superuser
 # TODO TEST!!!!
 import getopt, sys, socket, os
 file_loc = os.path.dirname(os.path.realpath(__file__))
@@ -50,11 +49,12 @@ def main(opts):
 	encoder = Encoder(pattern)
 
 	try:
-		sock = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
-		sock.bind(("0.0.0.0",port))
+		sock = makeUDP(port,False);
+		if (sock == None):
+			sys.exit(2)
 		message = None
 		while message == None:
-			message, (ftsAddr,ftsPort)  = sock.recvfrom(30)
+			message, (ftsAddr,ftsPort)  = sock.recvfrom(1450)
 			if (message[0] != 0x31):
 				message == None
 				continue
@@ -98,6 +98,7 @@ def main(opts):
 	if verbose:
 		print("Local Port - "+str(tcpPort))
 
+	# TODO TCP transmission
 	sys.exit(0)
 
 	tcp = TCPHandler(ftsAddr,-1,verbose)

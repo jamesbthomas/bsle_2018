@@ -25,6 +25,10 @@ def main(opts,args):
 	ftsAddr = "127.0.0.1"
 	# TODO FTS IP Address
 
+	# TODO local port to send traffic from
+	localPort = 65534
+	# TODO local port to send traffic from
+
 	file = None
 	path = None
 	pattern = None
@@ -93,12 +97,15 @@ def main(opts,args):
 
 	parts = socket.split(":")
 	addr = parts[0]
-	port = parts[1]
+	fssPort = parts[1]
 	crafter = PacketCrafter()
+	sock = makeUDP(localPort,True)
+	if (sock == None):
+		sys.exit(2)
 
 	try:
 		while True:
-			response = requestTransfer(addr,port,pattern,phrase,ftsAddr,verbose)
+			response = requestTransfer(addr,fssPort,pattern,phrase,ftsAddr,sock,verbose)
 			if response != None:
 				break
 			elif not interactive:
@@ -122,13 +129,15 @@ def main(opts,args):
 		sys.exit(0)
 
 	# Extract TCP port and verify validation message
-	tcpPort = crafter.unpackResponse(response,phrase)
+	tcpPort = crafter.unpackValidation(response,phrase)
+	print(sock)
+	sys.exit(0)
 	if not tcpPort:
 		sys.exit(3)
 
 	if not handler.contains(file_loc+"/IPAddWhiteList",addr):
-		if handler.add(file_loc+"/IPAddWhiteList",addr+","+port+","+pattern) != len(addr+","+port+","+pattern+"\n"):
-			print("Error: Internel - Failed to add to IPAddWhiteList")
+		if handler.add(file_loc+"/IPAddWhiteList",addr+","+fssPort+","+pattern) != len(addr+","+fssPort+","+pattern+"\n"):
+			print("Error: Internal - Failed to add to IPAddWhiteList")
 			sys.exit(2)
 
 	# Data Transfer

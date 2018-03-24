@@ -2,6 +2,7 @@
 # Assume all input validated before being passed to PacketCrafter
 from scapy.all import *
 from struct import *
+import socket
 
 class PacketCrafter:
 	'Packet Crafter for custom communication protocol'
@@ -67,18 +68,18 @@ class PacketCrafter:
 		pkt.validation = message
 		return pkt
 
-	def unpackResponse(self,pkt,message):
+	def unpackValidation(self,pkt,message):
 		# Unpack Packet Type 0x03
 		# Takes the packet and initialization message and returns the TCP Port for the transfer or None if the validation message does not match
 		# TODO find a way to convert unsent packet into raw bytes so we can unit test this
-		if int(pkt.load[0]) != 3:
+		if int(pkt[0]) != 0x03:
 			print("Error: Invalid Packet Type")
 			return None
-		tcpPort = pkt.load[1:3]
+		tcpPort = int.from_bytes(pkt[1:3],byteorder='big')
 		if tcpPort < 1 or tcpPort > 65535:
 			print("Error: Could not validate response - invalid TCP port number")
 			return None
-		validation = pkt.load[3:]
+		validation = pkt[3:].decode()
 		if validation != message:
 			print("Error: Could not validate response - incorrect validation message")
 			return None
@@ -108,6 +109,19 @@ class Response(Packet):
 	def payload(self):
 		# Test function used to extract the byte string representing this layer
 		return self.packetType
+
+# Function to create a UDP socket on the provided port
+## Return Value - the socket object on success, None otherwise
+def makeUDP(port,timeout):
+	try:
+		sock = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
+		sock.bind(('0.0.0.0',port))
+		if timeout:
+			sock.settimeout(0.003)
+		return sock
+	except socket.error as err:
+		print("Error: Failed to create UDP socket - "+err)
+		return None
 
 # Function to validate that a provided pattern is valid
 ## Return Value 0 - pattern is not valid

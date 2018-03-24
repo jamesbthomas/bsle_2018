@@ -22,10 +22,14 @@ void * transferSession(void * in);
 
 pthread_mutex_t sockets_lock;
 int * sockets;
+fd_set fds;
 
 int main(int argc, char ** argv){
 	// Create an array to hold the file descriptors
 	sockets = calloc(TOTAL_SOCKETS,sizeof(int));
+	// Create the struct to hold the timeout
+	struct timeval t;
+	t.tv_usec = TIMEOUT;
 	// For each socket we want to create
 	for (int i = 0;i < TOTAL_SOCKETS;i++){
 		// Create the file descriptor
@@ -42,10 +46,6 @@ int main(int argc, char ** argv){
 		addr.sin_family = AF_INET;
 		addr.sin_port = htons(port);
 		addr.sin_addr.s_addr = INADDR_ANY;
-		// Create the struct to hold the timeout
-		struct timeval t;
-		t.tv_sec = 0;
-		t.tv_usec = TIMEOUT;
 		// Set the timeout to the socket
 		if (setsockopt(fd,SOL_SOCKET,SO_RCVTIMEO,(char *)&t,sizeof(t)) == -1){
 			perror("Failed to apply timeout");
@@ -63,8 +63,6 @@ int main(int argc, char ** argv){
 	int maxfd = sockets[TOTAL_SOCKETS-1];
 	// Allocate a buffer to hold the messages
 	unsigned char * dgram = calloc(MAX_SIZE,sizeof(unsigned char));
-	// Allocate an FD set to keep track of the file descriptor statuses
-	fd_set fds;
 	// Create an array to track the thread IDs
 	pthread_t * tids = calloc(TOTAL_SOCKETS,sizeof(pthread_t));
 	int currThread = 0;
@@ -81,7 +79,7 @@ int main(int argc, char ** argv){
 			}
 		}
 		// Scan our sockets and until we get one that is ready
-		int rcvd = select(maxfd+1,&fds,NULL,NULL,NULL);
+		int rcvd = select(maxfd+1,&fds,NULL,NULL,&t);
 		for (int x = 0;x < TOTAL_SOCKETS;x++){
 			// Iterate through all of our sockets and see which one is ready
 			pthread_mutex_lock(&sockets_lock);
@@ -124,6 +122,7 @@ int main(int argc, char ** argv){
 
 // Function called to send the type 0x01 message, receive the 0x02 message, send the 0x03 message, and conduct the TCP data transfer
 void * transferSession(void * in){
+	printf("started\n");
         session * s = (session *) in;
         // Grab some admin info
         int ctwoPort = s->sport;
@@ -212,12 +211,11 @@ void * transferSession(void * in){
 		pthread_mutex_unlock(&sockets_lock);
 	}
 	 // send the packet
-	int pktSize = (int) strlen((char *) init);
-	while (sendto(sock,init,pktSize,0,(struct sockaddr *) &fss,sizeof(fss)) < pktSize){
+	int initSize = (int) strlen((char *) init);
+	while (sendto(sock,init,initSize,0,(struct sockaddr *) &fss,sizeof(fss)) < initSize){
 		// continue resending until we've sent everything, might introduce a weird bug on the FSS end if it sends some of the packet but not all of it
 		continue;
 	}
-	printf("sent init\n");
         // Receive 0x02, timeout causes thread to exit
 	unsigned char * response = calloc(MAX_SIZE,sizeof(unsigned char));
 	struct sockaddr_in resp;
@@ -242,7 +240,7 @@ void * transferSession(void * in){
 		pthread_mutex_unlock(&sockets_lock);
 		return NULL;
 	}
-	int tcpPort = response[1] || response[2] << 8;
+	int tcpPort = response[1] << 8 | response[2];
 	unsigned char * respMessage = calloc(messageLen,sizeof(unsigned char));
 	for (int i = 0;i < messageLen;i++){
 		respMessage[i] = response[i+3];
@@ -255,13 +253,31 @@ void * transferSession(void * in){
 		pthread_mutex_unlock(&sockets_lock);
 		return NULL;
 	}
-        // TODO craft 0x03
-        // TODO send 0x03
+        // Craft 0x03
+	unsigned char * validation = calloc(3+messageLen,sizeof(unsigned char));
+	validation[0] = 0x03;
+	validation[1] = tcpPort >> 8;
+	validation[2] = tcpPort & 0xff;
+	memcpy(validation+3,decode(respMessage,parsed),messageLen);
+        // Send 0x03
+	struct sockaddr_in ctwo;
+	ctwo.sin_family = AF_INET;
+	ctwo.sin_port = htons(ctwoPort);
+	if (inet_aton(ctwoAddr,&(ctwo.sin_addr)) < 0){
+		// Failed to convert C2 address
+		pthread_mutex_lock(&sockets_lock);
+		sockets[socketsIndex] = sock;
+		pthread_mutex_unlock(&sockets_lock);
+	}
+	while (sendto(sock,validation,3+messageLen,0,(struct sockaddr *) &ctwo,sizeof(ctwo)) < 3+messageLen){
+		continue;
+	}
         // TODO start TCP handler
 	printf("%s\t%d\t%d\t%d\n",ctwoAddr,ftsPort,ctwoPort,tcpPort);
 	printf("done\n");
 	pthread_mutex_lock(&sockets_lock);
 	sockets[socketsIndex] = sock;
 	pthread_mutex_unlock(&sockets_lock);
+	FD_SET(sock,&fds);
         return NULL;
 }
