@@ -139,7 +139,7 @@ def main(opts,args):
 	# Data Transfer
 	tcp = TCPHandler(ftsAddr,tcpPort,verbose)
 		## TCP Three-way Handshake
-	if not tcp.handshake(file):
+	if not tcp.handshake():
 		print("Error: TCP Handshake Failed")
 		sys.exit(4)
 
@@ -149,8 +149,6 @@ def main(opts,args):
 		print("WARNING: Total bytes sent does not match file size")
 	## TCP Close
 	tcp.socket.close()
-
-	time.sleep(1000)
 
 	print("Bye!")
 	return 0

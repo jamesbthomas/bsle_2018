@@ -81,39 +81,31 @@ def main(opts):
 				print("Error: Decode/Recode Failure")
 				sys.exit(2)
 
-			# Find an open TCP Port in the ephemeral range (49152-65535), open the socket to hold the IP address until we're ready to send/sniff
-			tcpSock = None
-			tcpPort = None
-			for port in range(49152,65536):
-				tcpSock = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
-				result = tcpSock.connect_ex(('0.0.0.0',port))
-				if result == 0:
-					tcpPort = port
-					break
-
-			if (tcpPort == None):
-				print("Error: Failed to find an open port")
-				sys.exit(0)
+			# Prep the TCP Listener
+			tcpSock = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+			tcpSock.bind(('0.0.0.0',0))
+			tcpPort = tcpSock.getsockname()[1]
+			tcpSock.listen(1)
 
 			# Send the 0x02 packet
 			sock.sendto(b'\x02'+tcpPort.to_bytes(2,byteorder='big')+recoded,(ftsAddr,ftsPort))
-
 			if verbose:
 				print("Local Port - "+str(tcpPort))
-
-			# TODO TCP transmission
-			continue
-
-			tcp = TCPHandler(ftsAddr,-1,verbose)
-			# Close socket, send packet, get ready for the shake
 			sock.close()
-			ready = False
-			while not ready:
-				ready,path = tcp.shake(port)
-			# Receive the file
+
 			if verbose:
 				print("Waiting for file...")
-			if tcp.recvFile(path) < 1:
+
+			tcp = TCPHandler(ftsAddr,-1,verbose)
+			s,src = tcpSock.accept()
+			s.settimeout(0.5)
+
+			if (src[0] != ftsAddr):
+				print("WRONG SOURCE")
+				sys.exit(0)
+
+			# Receive the file
+			if tcp.recvFile(s) < 1:
 				sys.exit(2)
 			print("Bye!")
 			sys.exit(0)

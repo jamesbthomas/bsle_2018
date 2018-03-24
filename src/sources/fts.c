@@ -162,8 +162,8 @@ void * transferSession(void * in){
                 return NULL;
         }
         // Scrape FSS Port
-        int fssPort = s->packet[6] | s->packet[5] << 8;
-        if (fssPort < 1 || fssPort > 65535){
+        int fssUDPPort = s->packet[6] | s->packet[5] << 8;
+        if (fssUDPPort < 1 || fssUDPPort > 65535){
                 // Invalid port number
 		pthread_mutex_lock(&sockets_lock);
 		sockets[socketsIndex] = sock;
@@ -203,7 +203,7 @@ void * transferSession(void * in){
 	  // setup the destination information
 	struct sockaddr_in fss;
 	fss.sin_family = AF_INET;
-	fss.sin_port = htons(fssPort);
+	fss.sin_port = htons(fssUDPPort);
 	if (inet_aton(fssAddr,&(fss.sin_addr)) < 0){
 		// Failed to convert FSS Address
 		pthread_mutex_lock(&sockets_lock);
@@ -260,10 +260,10 @@ void * transferSession(void * in){
 	validation[1] = ftsTCPPort >> 8;
 	validation[2] = ftsTCPPort & 0xff;
 	memcpy(validation+3,decode(respMessage,parsed),messageLen);
-        // Start TCP Server
+        // Start TCP Sockets
 	int tcpPort = ftsPort+TOTAL_SOCKETS-1; // TCP Ports begin immediately following the UDP port range, ie port 16000 UDP becomes 17000 TCP
-	int tcpSock = socket(AF_INET,SOCK_STREAM,0);
-	if (tcpSock < 0){
+	int ctwoListenSock = socket(AF_INET,SOCK_STREAM,0);
+	if (ctwoListenSock < 0){
 		perror("Socket Error: ");
 		pthread_mutex_lock(&sockets_lock);
 		sockets[socketsIndex] = sock;
@@ -271,14 +271,18 @@ void * transferSession(void * in){
 		FD_SET(sock,&fds);
 		return NULL;
 	}
+	int reuse = 1;
+	if (setsockopt(ctwoListenSock,SOL_SOCKET,SO_REUSEADDR,&reuse,sizeof(int)) < 0){
+		perror("Socket Option Error");
+	}
 	struct sockaddr_in tcpAddr;
 	tcpAddr.sin_family = AF_INET;
 	tcpAddr.sin_port = htons(tcpPort);
 	tcpAddr.sin_addr.s_addr = INADDR_ANY;
-	if (bind(tcpSock,(struct sockaddr *) &tcpAddr,sizeof(tcpAddr)) < 0){
+	if (bind(ctwoListenSock,(struct sockaddr *) &tcpAddr,sizeof(tcpAddr)) < 0){
 		perror("Bind Error: ");
 	}
-	if (listen(tcpSock,1) < 0){
+	if (listen(ctwoListenSock,1) < 0){
 		perror("Listen Error: ");
 	}
         // Send 0x03
@@ -296,7 +300,8 @@ void * transferSession(void * in){
 	}
 	// Accept the connection from the C2
 	struct sockaddr_in incoming;
-	int ctwoSock = accept(tcpSock,(struct sockaddr *) &incoming,sizeof(incoming));
+	socklen_t incSize = sizeof(incoming);
+	int ctwoSock = accept(ctwoListenSock,(struct sockaddr *) &incoming,&incSize);
 	// TODO make sure its from the right IP
 	if (ctwoSock < 0){
 		perror("Handshake Error: ");
@@ -305,7 +310,49 @@ void * transferSession(void * in){
 		pthread_mutex_unlock(&sockets_lock);
 		FD_SET(sock,&fds);
 	}
-	printf("%d\n",fssTCPPort);
+	// Write the data to a temporary file
+	char * data = calloc(MAX_SIZE,sizeof(unsigned char));
+	char * tmpfile = calloc(11,sizeof(char));
+	sprintf(tmpfile,"/tmp/%d",tcpPort);
+	int rcvd;
+	int totalrcvd = 0;
+	FILE * temp = fopen(tmpfile,"w");
+	while ( (rcvd = read(ctwoSock,data,MAX_SIZE)) > 0){
+		int res = fputs(data,temp);
+		if (res != 1){
+			perror("Write Error");
+		}
+		totalrcvd += rcvd;
+
+		memset(&data[0],0,strlen(data));
+	}
+	// Close the incoming connection
+	close(ctwoSock);
+	shutdown(ctwoListenSock,SHUT_RDWR);
+	// Connect to the FSS
+	struct sockaddr_in fssTCP;
+	fssTCP.sin_family = AF_INET;
+	fssTCP.sin_port = htons(fssTCPPort);
+	if (inet_aton(fssAddr,&(fssTCP.sin_addr)) < 0){
+		perror("FSS TCP ADDR");
+	}
+	if (connect(ctwoListenSock,(struct sockaddr *) &fssTCP,sizeof(fssTCP)) < 0){
+		perror("Connect");
+	}
+	fclose(temp);
+	// Send the File
+	FILE * tmp = fopen(tmpfile,"rb");
+	unsigned char * raw = calloc(MAX_SIZE,sizeof(unsigned char));
+	int sent = 0;
+	while (sent < totalrcvd){
+		int read = fread(raw,sizeof(unsigned char),MAX_SIZE,tmp);
+		int pktSize = send(ctwoListenSock,raw,read,0);
+		if (pktSize != read){
+			perror("Send Error");
+		}
+		sent += pktSize;
+		memset(&raw[0],0,read);
+	}
 	printf("done\n");
 	pthread_mutex_lock(&sockets_lock);
 	sockets[socketsIndex] = sock;

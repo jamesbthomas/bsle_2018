@@ -18,51 +18,15 @@ class TCPHandler():
 		self.nextSeq = 0
 		self.socket = None
 
-	def handshake(self,filename):
+	def handshake(self):
 		# Conducts the TCP three-way handshake with the destination and port provided at init
 		## Returns True if success, None otherwise
 		## Used by the C2 to initiate data transfer to the FTS
 		self.socket = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
 		self.socket.settimeout(5)
+		self.socket.setsockopt(socket.IPPROTO_TCP,socket.TCP_NODELAY,1)
 		self.socket.connect((self.dst,self.dport))
 		return True;
-
-	def shake(self,port):
-		# Accepts TCP three-way handshake
-		## Returns True if handshake successful, False otherwise
-		## USed by the FSS to tell the FTS to initiat encoded transfer
-		fails = 0
-		self.state = "LISTEN"
-		syn = None
-		while (fails < 3):
-			syn = sniff(filter="tcp dst port "+str(port)+" and ip src host "+self.dst,count=1)[0]
-			if not syn:
-				if syn[TCP].flags != 2:
-					syn = None
-				fails += 1
-			else:
-				self.state = "SYN_RCVD"
-				self.dport = syn[TCP].sport
-
-		if fails >= 3:
-			print("Error: Bad SYN")
-			return False
-		fails = 0
-		synAck = send(IP(dst=self.dst) / TCP(dport=self.dport,flags="SA",ack=syn[TCP].seq+1,seq=self.seq))
-		while (fails < 3):
-			ack = sniff(filter="tcp dst port "+str(port)+" and ip src host "+self.dst,count=1)[0]
-			if not ack:
-				if ack[TCP].flags != 16:
-					ack = None
-				fails += 1
-			else:
-				self.state = "ESTABLISHED"
-				break
-		if fails >= 3:
-			print("Error: Bad ACK")
-			return False
-		self.sport = port
-		return True,pkt.load
 
 	def sendFile(self,path,size):
 		# Checks to see if connection is established and sends the amount of data indicated by size from the file pointed to by path to the destination
@@ -72,7 +36,6 @@ class TCPHandler():
 			return -1
 		sent = 0
 		f = open(path,"rb")
-		name = self.socket.send(bytes(path.split("/")[-1],'us-ascii'))
 		while sent < size:
 			sent += self.socket.send(f.read())
 		if self.verbose:
@@ -80,50 +43,21 @@ class TCPHandler():
 		f.close()
 		return sent
 
-	def recvFile(self,path):
+	def recvFile(self,sock):
 		# Prepares to receive the file and saves it to the designated path
 		## Returns total number of bytes written to the file, -1 if failed
-		if self.sport == None:
-			print("Error: Cannot receive files without shaking first")
-			return -1
 		bytesRcvd = 0
 		t = time.localtime()
-		f = open(path+"_"+str(t.tm_hour)+str(t.tm_min)+"_"+str(t.tm_mon)+str(t.tm_mday),"wb")
-		# Sniff until we get a FIN packet
+		f = open(str(t.tm_hour)+str(t.tm_min)+"-"+str(t.tm_mon)+str(t.tm_mday),"wb")
+		pkt = sock.recv(1450)
 		try:
-			while True:
-				pkt = sniff(filter="tcp dst port "+str(PORT)+" and ip src host "+self.dst,count=1)[0]
-				if pkt:
-					if pkt[TCP].flags == 1:
-						break
-					else:
-						bytesRecvd += len(pkt.load)
-						f.write(pkt.load)
-		except IndexError:
-			print("Error: Failed to receive packets")
-			f.close()
-			return -1
-		# Handle the Close
-		send(IP(dst=self.dst) / TCP(dport=self.dport,sport=self.sport,flags="A"))
-		self.state = "CLOSE_WAIT"
-		fin = IP(dst=self.dst) / TCP(dport=self.dport,sport=self.sport,flags="F")
-		ack = None
-		while ack == None:
-			self.state = "LAST_ACK"
-			ack = sr1(fin,timeout=0.1,verbose=False)
-			if ack != None:
-				if ack[TCP].flags == 16:
-					self.state == "CLOSED"
-					f.close()
-					if verbose:
-						print("Transfer complete!")
-					return bytesRcvd
-				else:
-					self.state = "CLOSE_WAIT"
-					ack = None
+			while(pkt != b''):
+				f.write(pkt)
+				pkt = sock.recv(1450)
+		except socket.timeout:
+			pass
 		f.close()
-		print("Error: Failed to close")
-		return -1
+		return 0
 
 # Function to send the request packet to the FTS
 ## Returns the response packet (type 0x03) if the connection was successful, None otherwise
