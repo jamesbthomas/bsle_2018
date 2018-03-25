@@ -60,5 +60,9 @@ test: objects
 	-python3 $(TSTDIR)test.py
 	@echo "#####       C   TESTS    #####"
 	-$(TSTDIR)test
+	$(RMSRC)
+	$(RMHDR)
+	$(RMTST)
+	-rm -f src/testharness/test
 
 .PHONY: clean

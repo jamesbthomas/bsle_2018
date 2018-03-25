@@ -91,7 +91,6 @@ def main(opts):
 			sock.sendto(b'\x02'+tcpPort.to_bytes(2,byteorder='big')+recoded,(ftsAddr,ftsPort))
 			if verbose:
 				print("Local Port - "+str(tcpPort))
-			sock.close()
 
 			if verbose:
 				print("Waiting for file...")
@@ -112,8 +111,7 @@ def main(opts):
 
 			if verbose:
 				print("File Received - Wrote "+str(rcvd)+" bytes")
-			print("Bye!")
-			sys.exit(0)
+
 	except KeyboardInterrupt:
 		print("\nBye!")
 		sys.exit(0)

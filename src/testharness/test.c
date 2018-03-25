@@ -2,14 +2,25 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
+#include <sys/time.h>
 #include "CUnit/Basic.h"
 #include "../headers/encoder.h"
-//#include "../sources/encoder.c"
+#include "../headers/udpHandler.h"
+
+#define TIMEOUT 2000
+#define TOTAL_SOCKETS 1001
 
 Pattern * full;
 unsigned char * messagesFull;
 Pattern * repeat;
 unsigned char * messagesRepeat;
+
+Pattern * parsed;
+unsigned char * lo;
+unsigned char * fs;
+unsigned char * mid;
+unsigned char * zero;
 
 int init_enc(void){
 	full = calloc(1,sizeof(Pattern));
@@ -47,6 +58,60 @@ int init_enc(void){
 	return 0;
 }
 
+int init_udp(void){
+	parsed = calloc(1,sizeof(Pattern));
+	if (patternValidate(strdup("~:2;~:2"),parsed) != 0){
+		printf("FATAL - Failed to validate encoding pattern 'parsed'\n");
+		exit(1);
+	}
+	lo = calloc(20,sizeof(unsigned char));
+	lo[0] = 0x00;
+	lo[1] = 0x7f;
+	lo[2] = 0x00;
+	lo[3] = 0x00;
+	lo[4] = 0x01;
+	lo[5] = 0x00;
+	lo[6] = 0x01;
+	lo[7] = 0x00;
+	lo[8] = 0x07;
+	lo[9] = 0x7e;
+	lo[10] = 0x3a;
+	lo[11] = 0x32;
+	lo[12] = 0x3b;
+	lo[13] = 0x7e;
+	lo[14] = 0x3a;
+	lo[15] = 0x32;
+	lo[16] = 0x70;
+	lo[17] = 0x61;
+	lo[18] = 0x73;
+	lo[19] = 0x73;
+	fs = calloc(20,sizeof(unsigned char));
+	memcpy(fs,lo,20);
+	fs[1] = 0xff;
+	fs[2] = 0xff;
+	fs[3] = 0xff;
+	fs[4] = 0xff;
+	fs[5] = 0xff;
+	fs[6] = 0xff;
+	mid = calloc(20,sizeof(unsigned char));
+	memcpy(mid,lo,20);
+	mid[1] = 0x77;
+	mid[2] = 0x77;
+	mid[3] = 0x77;
+	mid[4] = 0x77;
+	mid[5] = 0x77;
+	mid[6] = 0x77;
+	zero = calloc(20,sizeof(unsigned char));
+	memcpy(zero,lo,20);
+	zero[1] = 0x00;
+	zero[2] = 0x00;
+	zero[3] = 0x00;
+	zero[4] = 0x00;
+	zero[5] = 0x00;
+	zero[6] = 0x00;
+	return 0;
+}
+
 int clean_enc(void){
 	if (full != NULL){
 		free(full);
@@ -59,6 +124,25 @@ int clean_enc(void){
 	}
 	if (messagesRepeat != NULL){
 		free(messagesRepeat);
+	}
+	return 0;
+}
+
+int clean_udp(void){
+	if (parsed != NULL){
+		free(parsed);
+	}
+	if (lo != NULL){
+		free(lo);
+	}
+	if (fs != NULL){
+		free(fs);
+	}
+	if (mid != NULL){
+		free(mid);
+	}
+	if (zero != NULL){
+		free(zero);
 	}
 	return 0;
 }
@@ -199,21 +283,88 @@ void testDECODE(void){
 	free(mess);
 }
 
+
+///	UDP HANDLER TESTS	///
+// Function containing the tests for the makeSocket function
+void testMAKESOCKET(void){
+	struct timeval t;
+	t.tv_usec = TIMEOUT;
+	for (int i = 0; i < TOTAL_SOCKETS;i ++){
+		CU_ASSERT(makeSocket(i,&t) == (i+3));
+	}
+	for (int i = 0; i < TOTAL_SOCKETS; i++){
+		close(i+3);
+	}
+}
+
+// Function containing the tests for the scrapeAddr function
+void testSCRAPEADDR(void){
+	char * addr = calloc(16,sizeof(char));
+	CU_ASSERT(scrapeAddr(addr,lo) == 0);
+	CU_ASSERT(strncmp(addr,"127.0.0.1",strlen(addr)) == 0);
+	CU_ASSERT(scrapeAddr(addr,mid) == 0);
+	CU_ASSERT(strncmp(addr,"119.119.119.119",strlen(addr)) == 0);
+	// Broadcast address
+	unsigned char zeroes[] = {0x00, 0x00, 0x00, 0x00, 0x00};
+	CU_ASSERT(scrapeAddr(addr,zeroes) == 1);
+	unsigned char fs[] = {0x00,0xff,0xff,0xff,0xff};
+	CU_ASSERT(scrapeAddr(addr,fs) == 1);
+	free(addr);
+}
+
+// Function containing the tests for the scrapePort function
+void testSCRAPEPORT(void){
+	// Good ports
+	CU_ASSERT(scrapePort(lo) == 1);
+	CU_ASSERT(scrapePort(fs) == 65535);
+	CU_ASSERT(scrapePort(mid) == 30583);
+	// Bad ports
+	CU_ASSERT(scrapePort(zero) == -1);
+}
+
+// Function containing the tests for the scrapePattern function
+void testSCRAPEPATTERN(void){
+	
+}
+
+// Function containing the tests for the scrapeMessage function
+void testSCRAPEMESSAGE(void){
+	CU_ASSERT(0 == 1);
+}
+
+// Function containing the tests for the unpackResponse function
+void testUNPACKRESPONSE(void){
+	CU_ASSERT(0 == 1);
+}
+
 int main(int argc, char ** argv){
 	CU_pSuite encSuite = NULL;
+	CU_pSuite udpSuite = NULL;
 	if (CUE_SUCCESS != CU_initialize_registry()){
 		return CU_get_error();
 	}
 	encSuite = CU_add_suite("Encoder",init_enc,clean_enc);
-	if (NULL == encSuite){
+	udpSuite = CU_add_suite("UDPHandler",init_udp,clean_udp);
+	if (NULL == encSuite || NULL == udpSuite){
 		CU_cleanup_registry();
 		return CU_get_error();
 	}
+	// Add encoder suite tests
 	if ((NULL == CU_add_test(encSuite,"ror()",testROR)) ||
 		(NULL == CU_add_test(encSuite,"rol()",testROL)) ||
 		(NULL == CU_add_test(encSuite,"patternValidate()",testPatternValidate)) ||
 		(NULL == CU_add_test(encSuite,"encode()",testENCODE)) ||
 		(NULL == CU_add_test(encSuite,"decode()",testDECODE))){
+		CU_cleanup_registry();
+		return CU_get_error();
+	}
+	// Add udp suite tests
+	if ((NULL == CU_add_test(udpSuite,"makeSocket()",testMAKESOCKET)) ||
+		(NULL == CU_add_test(udpSuite,"scrapeAddr()",testSCRAPEADDR)) ||
+		(NULL == CU_add_test(udpSuite,"scrapePort()",testSCRAPEPORT)) ||
+		(NULL == CU_add_test(udpSuite,"scrapePattern()",testSCRAPEPATTERN)) ||
+		(NULL == CU_add_test(udpSuite,"scrapeMessage()",testSCRAPEMESSAGE)) ||
+		(NULL == CU_add_test(udpSuite,"unpackResponse()",testUNPACKRESPONSE))){
 		CU_cleanup_registry();
 		return CU_get_error();
 	}
