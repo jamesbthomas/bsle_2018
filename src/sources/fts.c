@@ -225,48 +225,12 @@ void * transferSession(void * in){
 	free(message);
         // Craft 0x03
 	unsigned char * validation = calloc(3+messageLen,sizeof(unsigned char));
-	validation[0] = 0x03;
-	int ftsTCPPort = ftsPort + 1000;
-	validation[1] = ftsTCPPort >> 8;
-	validation[2] = ftsTCPPort & 0xff;
-	memcpy(validation+3,decoded,messageLen);
-	free(decoded);
-        // Start TCP Sockets
 	int tcpPort = ftsPort+TOTAL_SOCKETS-1; // TCP Ports begin immediately following the UDP port range, ie port 16000 UDP becomes 17000 TCP
-	int ctwoListenSock = socket(AF_INET,SOCK_STREAM,0);
+	craftValidation(validation,decoded,tcpPort,messageLen);
+	free(decoded);
+        // Start TCP Socket
+	int ctwoListenSock = makeTCPSocket(tcpPort);
 	if (ctwoListenSock < 0){
-		perror("Socket Create Error");
-		free(fssAddr);
-		free(parsed);
-		free(validation);
-		threadClose(socketsIndex,sock);
-		return NULL;
-	}
-	int reuse = 1;
-	if (setsockopt(ctwoListenSock,SOL_SOCKET,SO_REUSEADDR,&reuse,sizeof(int)) < 0){
-		perror("Set Socket Option Error");
-		free(fssAddr);
-		free(parsed);
-		free(validation);
-		close(ctwoListenSock);
-		threadClose(socketsIndex,sock);
-		return NULL;
-	}
-	struct sockaddr_in tcpAddr;
-	tcpAddr.sin_family = AF_INET;
-	tcpAddr.sin_port = htons(tcpPort);
-	tcpAddr.sin_addr.s_addr = INADDR_ANY;
-	if (bind(ctwoListenSock,(struct sockaddr *) &tcpAddr,sizeof(tcpAddr)) < 0){
-		perror("Bind Error");
-		free(fssAddr);
-		free(parsed);
-		free(validation);
-		close(ctwoListenSock);
-		threadClose(socketsIndex,sock);
-		return NULL;
-	}
-	if (listen(ctwoListenSock,1) < 0){
-		perror("Listen Error");
 		free(fssAddr);
 		free(parsed);
 		free(validation);

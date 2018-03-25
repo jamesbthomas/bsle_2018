@@ -7,6 +7,7 @@
 #include "CUnit/Basic.h"
 #include "../headers/encoder.h"
 #include "../headers/udpHandler.h"
+#include "../headers/tcpHandler.h"
 
 #define TIMEOUT 2000
 #define TOTAL_SOCKETS 1001
@@ -146,6 +147,10 @@ int init_udp(void){
 	return 0;
 }
 
+int init_tcp(void){
+	return 0;
+}
+
 int clean_enc(void){
 	if (full != NULL){
 		free(full);
@@ -178,6 +183,10 @@ int clean_udp(void){
 	if (zero != NULL){
 		free(zero);
 	}
+	return 0;
+}
+
+int clean_tcp(void){
 	return 0;
 }
 
@@ -324,10 +333,9 @@ void testMAKESOCKET(void){
 	struct timeval t;
 	t.tv_usec = TIMEOUT;
 	for (int i = 0; i < TOTAL_SOCKETS;i ++){
-		CU_ASSERT(makeSocket(i,&t) == (i+3));
-	}
-	for (int i = 0; i < TOTAL_SOCKETS; i++){
-		close(i+3);
+		int s = makeSocket(i,&t);
+		CU_ASSERT(s != -1);
+		close(s);
 	}
 }
 
@@ -421,15 +429,45 @@ void testUNPACKRESPONSE(void){
 	CU_ASSERT(unpackResponse(type,parsed,message,decoded,4) == -1);
 }
 
+// Function containing the tests for the makeTCPSocket function
+void testMAKETCPSOCKET(void){
+	int s = makeTCPSocket(16000);
+	CU_ASSERT(s != -1);
+	close(s);
+	// Bad ports
+	s = makeTCPSocket(-1);
+	CU_ASSERT(s == -1);
+	s = makeTCPSocket(65536);
+	CU_ASSERT(s == -1);
+}
+
+// Function containing the tests for the craftValidation function
+void testCRAFTVALIDATION(void){
+	unsigned char * validation = calloc(7,sizeof(unsigned char));
+	unsigned char * decoded = (unsigned char *) "pass";
+	unsigned char pass[] = {0x03,0x42,0x68,0x70,0x61,0x73,0x73};
+	CU_ASSERT(craftValidation(validation,decoded,17000,4) == 0);
+	CU_ASSERT(memcmp(validation,pass,7) == 0);
+	unsigned char mass[] = {0x03,0xff,0xff,0x6d,0x61,0x73,0x73};
+	decoded = (unsigned char *) "mass";
+	CU_ASSERT(craftValidation(validation,decoded,65535,4) == 0);
+	CU_ASSERT(memcmp(validation,mass,7) == 0);
+	// Bad port
+	CU_ASSERT(craftValidation(validation,decoded,65536,4) == -1);
+	CU_ASSERT(craftValidation(validation,decoded,0,4) == -1);
+}
+
 int main(int argc, char ** argv){
 	CU_pSuite encSuite = NULL;
 	CU_pSuite udpSuite = NULL;
+	CU_pSuite tcpSuite = NULL;
 	if (CUE_SUCCESS != CU_initialize_registry()){
 		return CU_get_error();
 	}
 	encSuite = CU_add_suite("Encoder",init_enc,clean_enc);
 	udpSuite = CU_add_suite("UDPHandler",init_udp,clean_udp);
-	if (NULL == encSuite || NULL == udpSuite){
+	tcpSuite = CU_add_suite("TCPHandler",init_tcp,clean_tcp);
+	if (NULL == encSuite || NULL == udpSuite || NULL == tcpSuite){
 		CU_cleanup_registry();
 		return CU_get_error();
 	}
@@ -449,6 +487,12 @@ int main(int argc, char ** argv){
 		(NULL == CU_add_test(udpSuite,"scrapePattern()",testSCRAPEPATTERN)) ||
 		(NULL == CU_add_test(udpSuite,"scrapeMessage()",testSCRAPEMESSAGE)) ||
 		(NULL == CU_add_test(udpSuite,"unpackResponse()",testUNPACKRESPONSE))){
+		CU_cleanup_registry();
+		return CU_get_error();
+	}
+	// Add tcp suite tests
+	if ((NULL == CU_add_test(tcpSuite,"makeTCPSocket()",testMAKETCPSOCKET)) ||
+		(NULL == CU_add_test(tcpSuite,"craftValidation()",testCRAFTVALIDATION))){
 		CU_cleanup_registry();
 		return CU_get_error();
 	}
