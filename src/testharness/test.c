@@ -85,7 +85,7 @@ int init_udp(void){
 	lo[17] = 0x61;
 	lo[18] = 0x73;
 	lo[19] = 0x73;
-	fs = calloc(20,sizeof(unsigned char));
+	fs = calloc(23,sizeof(unsigned char));
 	memcpy(fs,lo,20);
 	fs[1] = 0xff;
 	fs[2] = 0xff;
@@ -93,7 +93,22 @@ int init_udp(void){
 	fs[4] = 0xff;
 	fs[5] = 0xff;
 	fs[6] = 0xff;
-	mid = calloc(20,sizeof(unsigned char));
+	fs[8] = 0x09;
+	fs[9] = 0x5e;
+	fs[10] = 0x33;
+	fs[11] = 0x3a;
+	fs[12] = 0x31;
+	fs[13] = 0x3b;
+	fs[14] = 0x5e;
+	fs[15] = 0x33;
+	fs[16] = 0x3a;
+	fs[17] = 0x31;
+	fs[18] = 0x6d;
+	fs[19] = 0x61;
+	fs[20] = 0x73;
+	fs[21] = 0x73;
+	fs[22] = 0x65;
+	mid = calloc(26,sizeof(unsigned char));
 	memcpy(mid,lo,20);
 	mid[1] = 0x77;
 	mid[2] = 0x77;
@@ -101,14 +116,33 @@ int init_udp(void){
 	mid[4] = 0x77;
 	mid[5] = 0x77;
 	mid[6] = 0x77;
-	zero = calloc(20,sizeof(unsigned char));
-	memcpy(zero,lo,20);
+	mid[8] = 0x0d;
+	mid[9] = 0x72;
+	mid[10] = 0x6f;
+	mid[11] = 0x72;
+	mid[12] = 0x39;
+	mid[13] = 0x3a;
+	mid[14] = 0x37;
+	mid[15] = 0x3b;
+	mid[16] = 0x72;
+	mid[17] = 0x6f;
+	mid[18] = 0x72;
+	mid[19] = 0x39;
+	mid[20] = 0x3a;
+	mid[21] = 0x37;
+	mid[22] = 0x70;
+	mid[23] = 0x61;
+	mid[24] = 0x73;
+	mid[25] = 0x73;
+	zero = calloc(26,sizeof(unsigned char));
+	memcpy(zero,mid,26);
 	zero[1] = 0x00;
 	zero[2] = 0x00;
 	zero[3] = 0x00;
 	zero[4] = 0x00;
 	zero[5] = 0x00;
 	zero[6] = 0x00;
+	zero[9] = 0x71;
 	return 0;
 }
 
@@ -305,9 +339,7 @@ void testSCRAPEADDR(void){
 	CU_ASSERT(scrapeAddr(addr,mid) == 0);
 	CU_ASSERT(strncmp(addr,"119.119.119.119",strlen(addr)) == 0);
 	// Broadcast address
-	unsigned char zeroes[] = {0x00, 0x00, 0x00, 0x00, 0x00};
-	CU_ASSERT(scrapeAddr(addr,zeroes) == 1);
-	unsigned char fs[] = {0x00,0xff,0xff,0xff,0xff};
+	CU_ASSERT(scrapeAddr(addr,zero) == 1);
 	CU_ASSERT(scrapeAddr(addr,fs) == 1);
 	free(addr);
 }
@@ -324,17 +356,69 @@ void testSCRAPEPORT(void){
 
 // Function containing the tests for the scrapePattern function
 void testSCRAPEPATTERN(void){
-	
+	CU_ASSERT(scrapePattern(parsed,lo) == 7);
+	CU_ASSERT(parsed->numOpts == 2);
+	CU_ASSERT('~' == parsed->ops[0]);
+	CU_ASSERT('~' == parsed->ops[1]);
+	CU_ASSERT(parsed->vals[0] == 0);
+	CU_ASSERT(parsed->vals[1] == 0);
+	CU_ASSERT(parsed->lens[0] == 2);
+	CU_ASSERT(parsed->lens[1] == 2);
+	CU_ASSERT(scrapePattern(parsed,fs) == 9);
+	CU_ASSERT(parsed->numOpts == 2);
+	CU_ASSERT('^' == parsed->ops[0]);
+	CU_ASSERT('^' == parsed->ops[1]);
+	CU_ASSERT(parsed->vals[0] == 3);
+	CU_ASSERT(parsed->vals[1] == 3);
+	CU_ASSERT(parsed->lens[0] == 1);
+	CU_ASSERT(parsed->lens[1] == 1);
+	CU_ASSERT(scrapePattern(parsed,mid) == 13);
+	CU_ASSERT(parsed->numOpts == 2);
+	CU_ASSERT('r' == parsed->ops[0]);
+	CU_ASSERT('r' == parsed->ops[1]);
+	CU_ASSERT(parsed->vals[0] == 1);
+	CU_ASSERT(parsed->vals[1] == 1);
+	CU_ASSERT(parsed->lens[0] == 7);
+	CU_ASSERT(parsed->lens[1] == 7);
+	// Bad Pattern
+	freopen("/dev/null","w",stdout); // redirect stdout
+	CU_ASSERT(scrapePattern(parsed,zero) == -1);
+	freopen("/dev/tty","w",stdout);
 }
 
 // Function containing the tests for the scrapeMessage function
 void testSCRAPEMESSAGE(void){
-	CU_ASSERT(0 == 1);
+	patternValidate(strdup("~:2;~:2"),parsed);
+	unsigned char * message = calloc(4,sizeof(unsigned char));
+	unsigned char * init = calloc(5,sizeof(unsigned char));
+	CU_ASSERT(scrapeMessage(message,lo,16,20,parsed,init) == 4);
+	unsigned char initOne[] = {0x01,0x8f,0x9e,0x8c,0x8c};
+	CU_ASSERT(memcmp(init,initOne,5) == 0);
+	message = realloc(message,5);
+	init = realloc(init,6);
+	CU_ASSERT(scrapeMessage(message,fs,18,23,parsed,init) == 5);
+	unsigned char initTwo[] = {0x01,0x92,0x9e,0x8c,0x8c,0x9a};
+	CU_ASSERT(memcmp(init,initTwo,6) == 0);
+	free(message);
+	free(init);
 }
 
 // Function containing the tests for the unpackResponse function
 void testUNPACKRESPONSE(void){
-	CU_ASSERT(0 == 1);
+	patternValidate(strdup("~:2;~:2"),parsed);
+	unsigned char * message = (unsigned char *) "pass";
+	unsigned char * decoded = calloc(4,sizeof(unsigned char));
+	unsigned char good[] = {0x02,0xb5,0x73,0x8f,0x9e,0x8c,0x8c};
+	CU_ASSERT(unpackResponse(good,parsed,message,decoded,4) == 46451);
+	// Bad port
+	unsigned char badPort[] = {0x02,0x00,0x00,0x8f,0x9e,0x8c,0x8c};
+	CU_ASSERT(unpackResponse(badPort,parsed,message,decoded,4) == -1);
+	// Message doesnt match
+	unsigned char mass[] = {0x02,0xb5,0x73,0x92,0x9e,0x8c,0x8c};
+	CU_ASSERT(unpackResponse(mass,parsed,message,decoded,4) == -1);
+	// Bad packet type
+	unsigned char type[] = {0xff,0xb5,0x73,0x8f,0x9e,0x8c,0x8c};
+	CU_ASSERT(unpackResponse(type,parsed,message,decoded,4) == -1);
 }
 
 int main(int argc, char ** argv){

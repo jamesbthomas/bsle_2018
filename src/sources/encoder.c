@@ -149,7 +149,7 @@ unsigned char rol(const unsigned char value, int shift){
 // Returns encoded string if successful, NULL otherwise
 unsigned char * encode(unsigned char * data,Pattern * parsed){
 	int currOpt = 0;
-	int size = strlen((char *) data)-1;
+	int size = strlen((char *) data);
 	int done = 0;
 	unsigned char * encoded = calloc(size,sizeof(unsigned char));
 	while (done < size){
