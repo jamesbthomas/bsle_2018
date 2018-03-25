@@ -231,6 +231,48 @@ unsigned char * decode(unsigned char * data,Pattern * parsed){
 	return decoded;
 }
 
+// Function to encode a provided string using base64
+// Returns encoded string if successful, NULL otherwise
+// Used by each transfer session to create its log entry
+unsigned char * base64(unsigned char * string){
+	unsigned char dict[] = {0x41,0x42,0x43,0x44,0x45,0x46,0x47,0x48,0x49,0x4a,0x4b,0x4c,0x4d,0x4e,0x4f,
+				0x50,0x51,0x52,0x53,0x54,0x55,0x56,0x57,0x58,0x59,0x5a,0x61,0x62,0x63,0x64,
+				0x65,0x66,0x67,0x68,0x69,0x6a,0x6b,0x6c,0x6d,0x6e,0x6f,0x70,0x71,0x72,0x73,
+				0x74,0x75,0x76,0x77,0x78,0x79,0x7a,0x30,0x31,0x32,0x33,0x34,0x35,0x36,0x37,
+				0x38,0x39,0x2b,0x2f};
+	int len = strlen((char *) string);
+	unsigned char * encoded = calloc(len+(4*(len%3)),sizeof(unsigned char));
+	int enc = 0;
+	for (int plain = 0;plain < len;plain+=3){
+		// If we need to pad twice
+		if (plain+1 >= len){
+			int together = string[plain] << 4;
+			encoded[enc] = dict[together >> 6];
+			encoded[enc+1] = dict[together & 0x3f];
+			encoded[enc+2] = 0x3d;
+			encoded[enc+3] = 0x3d;
+		}
+		// If we need to pad once
+		else if (plain+2 >= len){
+			int together = string[plain] << 10 | string[plain+1] << 2;
+			encoded[enc] = dict[together >> 12];
+			encoded[enc+1] = dict[together >> 6 & 0x3f];
+			encoded[enc+2] = dict[together & 0x3f];
+			encoded[enc+3] = 0x3d;
+		}
+		// No padding
+		else{
+			int together = string[plain] << 16 | string[plain+1] << 8 | string[plain+2];
+			encoded[enc] = dict[together >> 18];
+			encoded[enc+1] = dict[together >> 12 & 0x3f];
+			encoded[enc+2] = dict[together >> 6 & 0x3f];
+			encoded[enc+3] = dict[together & 0x3f];
+		}
+		enc += 4;
+	}
+	return encoded;
+}
+
 #endif
 /* Main function for interacting directly with this module
 int main(int argc,char ** argv){

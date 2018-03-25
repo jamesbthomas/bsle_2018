@@ -326,6 +326,22 @@ void testDECODE(void){
 	free(mess);
 }
 
+// Function containing the tests for the base64 function
+void testBASE64(void){
+	// Just the right length
+	char * pas = "pas";
+	unsigned char encPas[] = {0x63,0x47,0x46,0x7a};
+	CU_ASSERT(memcmp(base64((unsigned char *) pas),encPas,4) == 0);
+	// One more
+	char * pass = "pass";
+	unsigned char encPass[] = {0x63,0x47,0x46,0x7a,0x63,0x77,0x3d,0x3d};
+	CU_ASSERT(memcmp(base64((unsigned char *) pass),encPass,8) == 0);
+	// Two more
+	char * passe = "passe";
+	unsigned char encPasse[] = {0x63,0x47,0x46,0x7a,0x63,0x32,0x55,0x3d};
+	CU_ASSERT(memcmp(base64((unsigned char *) passe),encPasse,8) == 0);
+}
+
 
 ///	UDP HANDLER TESTS	///
 // Function containing the tests for the makeSocket function
@@ -476,7 +492,8 @@ int main(int argc, char ** argv){
 		(NULL == CU_add_test(encSuite,"rol()",testROL)) ||
 		(NULL == CU_add_test(encSuite,"patternValidate()",testPatternValidate)) ||
 		(NULL == CU_add_test(encSuite,"encode()",testENCODE)) ||
-		(NULL == CU_add_test(encSuite,"decode()",testDECODE))){
+		(NULL == CU_add_test(encSuite,"decode()",testDECODE)) ||
+		(NULL == CU_add_test(encSuite,"base64()",testBASE64))){
 		CU_cleanup_registry();
 		return CU_get_error();
 	}
