@@ -7,7 +7,6 @@ from encoder import *
 
 class UDPHandler:
 
-	# UDP Packet Section
 	def craftRequest(self,addr,port,pattern,phrase,name):
 		# Craft Packet Type 0x00
 		# Field 1 - Address of the FSS
@@ -35,14 +34,22 @@ class UDPHandler:
 		return pkt
 
 	def unpackInit(self,pkt):
-		# Unpack Packet Type 0x01
-		# Verifies packet type and returns the encoded initialization message, or None if error
-		# TODO find a way to automate testing this, see unpackResponse
-		if (int(pkt.load[0]) != 49): # dec 49 = ascii 1
-			print("Error: Invalid Packet Type")
-			return None
-		return pkt.load[1:],pkt[IP].src,pkt[UDP].sport
-		# TODO see if this is necessary from the FSS side
+		# Unpack packet type 0x01
+		try:
+			# Verify packet type
+			if pkt[0] != 0x01:
+				return None,None
+			# Scrape the length of the message
+			messageLen = pkt[1] << 8 | pkt[2]
+			if (messageLen+3 > len(pkt)):
+				return None,None
+			# Scrape the message
+			message = pkt[3:3+messageLen]
+			# Scrape the filename
+			filename = pkt[3+messageLen:]
+			return message,filename
+		except IndexError:
+			return None, None
 
 	def convertAddr(self,addr):
 		# Convert an IP address from a string to a number that can be put into the packet
@@ -65,9 +72,16 @@ class UDPHandler:
 		return decimal
 
 	def craftResponse(self,port,message):
-		# Craft Packet type 0x02/0x03
-		# TODO modify to match new algorithm
-		return None
+		# Craft Packet type 0x02
+		# Field 1 - packet type
+		pktType = b'\x02'
+		# Field 2 - port number
+		if port < 1 or port > 65535:
+			return None
+		portBytes = port.to_bytes(2,byteorder='big')
+		# Field 3 - Validation message
+		messageBytes = bytes(message,'us-ascii')
+		return pktType+portBytes+messageBytes
 
 	def unpackValidation(self,pkt,message):
 		# Unpack Packet Type 0x03
@@ -131,4 +145,4 @@ def requestTransfer(addr,port,pattern,phrase,ftsAddr,localport,verbose):
 # Used for dev testing
 if __name__ == "__main__":
 	udp = UDPHandler()
-	print(udp.craftRequest("127.0.0.1","1111","~:40;rol1:120","firstTest"))
+	print(udp.unpackInit(b'\x01\x00\x04\x8f\x9e\x8c\x8c\x74\x65\x73\x74'))

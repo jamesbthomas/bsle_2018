@@ -55,14 +55,13 @@ def main(opts):
 	try:
 		while True:
 			try:
-				message = None
-				while message == None:
-					message, (ftsAddr,ftsPort)  = sock.recvfrom(1450)
-					if (message[0] != 0x31):
-						message == None
-						continue
-					if verbose:
-						print("Received message from {0}:{1} - {2}".format(ftsAddr,ftsPort,message))
+				while True:
+					pkt, (ftsAddr,ftsPort)  = sock.recvfrom(1450)
+					message,filename = udp.unpackInit(pkt)
+					if message != None and filename != None:
+						if verbose:
+							print("Received message from {0}:{1} - {2}".format(ftsAddr,ftsPort,message))
+						break
 			except KeyboardInterrupt: # Round-about way to keyboard interrupt the sniff
 				# CTRL+C will stop sniff but not throw the Interrupt into the main thread
 				# If you CTRL+C, then it will IndexError when trying to index into the packets that were sniffed

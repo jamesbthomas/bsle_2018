@@ -199,15 +199,35 @@ class CraftRequestTestCase(DefaultTestCase):
 class CraftResponseTestCase(DefaultTestCase):
 
 	def runTest(self):
-		return 0
-		# TODO
-		first = self.udp.craftResponse(1337,"validation message")
-		self.assertEqual(first.tcpPort,1337)
-		self.assertEqual(first.validation,b"validation message")
-		second = self.udp.craftResponse(0,b"low port")
+		# good input
+		first = self.udp.craftResponse(1337,"pass")
+		firstpkt = b'\x02\x05\x39pass'
+		self.assertEqual(first,firstpkt)
+		# low port
+		second = self.udp.craftResponse(0,"low port")
 		self.assertEqual(second,None)
-		third = self.udp.craftResponse(65536,b"high port")
+		# high port
+		third = self.udp.craftResponse(65536,"high port")
 		self.assertEqual(third,None)
+
+class UnpackInitTestCase(DefaultTestCase):
+
+	def runTest(self):
+		# right size
+		goodpkt = b'\x01\x00\x04\x8f\x9e\x8c\x8c\x74\x65\x73\x74'
+		mess,name = self.udp.unpackInit(goodpkt)
+		self.assertEqual(mess,b'\x8f\x9e\x8c\x8c')
+		self.assertEqual(name,b'test')
+		# too short
+		shortpkt = b'\x01\x00\x04'
+		mess,name = self.udp.unpackInit(shortpkt)
+		self.assertEqual(mess,None)
+		self.assertEqual(name,None)
+		# wrong packet type
+		typepkt = b'\x00\x00\x04\x8f\x9e\x8c\x8c\x74\x65\x73\x74'
+		mess,name = self.udp.unpackInit(typepkt)
+		self.assertEqual(mess,None)
+		self.assertEqual(name,None)
 
 class ContainsTestCase(DefaultTestCase):
 
