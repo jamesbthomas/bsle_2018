@@ -90,20 +90,6 @@ def makeUDP(port,timeout):
 		print("Error: Failed to create UDP socket - "+err)
 		return None
 
-# Function to validate that a provided pattern is valid
-## Return Value 0 - pattern is not valid
-## Return Value 1 - pattern is valid
-def patternValidate(pattern):
-	opts = pattern.split(";")
-	if (len(opts) < 2):
-		print("Error: Insufficient Encoding Options")
-		return 0
-	for set in opts:
-		if not re.match('(~|\^\d+|ror\d+|rol\d+):\d+',set):
-			print("Error: Invalid Encoding Pattern")
-			return 0
-	return 1
-
 # Function to send the request packet to the FTS and receive the validation packet
 ## Returns the validation packet (type 0x03) if the connection was successful, None otherwise
 def requestTransfer(addr,port,pattern,phrase,ftsAddr,localport,verbose):
@@ -135,4 +121,5 @@ def requestTransfer(addr,port,pattern,phrase,ftsAddr,localport,verbose):
 
 # Used for dev testing
 if __name__ == "__main__":
-	print("running")
+	udp = UDPHandler()
+	print(udp.craftRequest("127.0.0.1","1111","~:40;rol1:120","firstTest"))

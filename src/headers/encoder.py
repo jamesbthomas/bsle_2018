@@ -122,6 +122,20 @@ class Encoder:
 			print(err)
 			return None
 
+# Function to validate that a provided pattern is valid
+## Returns False = pattern is not valid
+## Returns True = pattern is valid
+def patternValidate(pattern):
+	opts = pattern.split(";")
+	if (len(opts) < 2):
+		print("ERROR: Insufficient Encoding Options")
+		return False
+	for opVal in opts:
+		if not re.match('(~|\^\d+|ror\d+|rol\d+):\d+',opVal):
+			print("ERROR: Invalid Encoding Option")
+			return False
+	return True
+
 # Used for dev testing
 if __name__ == "__main__":
 	enc = Encoder("ror1:40;rol1:120")
