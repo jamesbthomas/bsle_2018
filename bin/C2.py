@@ -8,7 +8,7 @@ file_loc = os.path.dirname(os.path.realpath(__file__)) # Find the directory this
 headers_dir = "/".join(file_loc.split("/")[:-1])+"/src/headers"	# Location of the header file
 sys.path.append(headers_dir)
 try:
-	from packetCrafter import *
+	from udpHandler import *
 	from fileHandler import *
 	from tcpHandler import *
 except ImportError as err:
@@ -43,6 +43,8 @@ def main(opts,args):
 		# Run the prompt sequence
 		global interactive
 		interactive  = True
+		global verbose
+		verbose = True
 		while True:
 			try:
 				file = input("Path to file: ").strip()
@@ -98,11 +100,11 @@ def main(opts,args):
 	parts = socket.split(":")
 	addr = parts[0]
 	fssPort = parts[1]
-	crafter = PacketCrafter()
+	udp = UDPHandler()
 
 	try:
 		while True:
-			response, ftsPort = requestTransfer(addr,fssPort,pattern,phrase,ftsAddr,localPort,verbose)
+			response = requestTransfer(addr,fssPort,pattern,phrase,ftsAddr,localPort,verbose)
 			if response != None:
 				break
 			elif not interactive:
@@ -126,7 +128,7 @@ def main(opts,args):
 		sys.exit(0)
 
 	# Extract TCP port and verify validation message
-	tcpPort = crafter.unpackValidation(response,phrase)
+	tcpPort = udp.unpackValidation(response,phrase)
 	if not tcpPort:
 		sys.exit(3)
 

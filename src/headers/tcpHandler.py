@@ -2,7 +2,7 @@
 import re, random, os, time, socket
 from scapy.all import *
 from encoder import *
-from packetCrafter import *
+from udpHandler import *
 # TODO TEST!!!!!
 class TCPHandler():
 
@@ -62,41 +62,6 @@ class TCPHandler():
 			return -1
 		f.close()
 		return total
-
-# Function to send the request packet to the FTS
-## Returns the response packet (type 0x03) if the connection was successful, None otherwise
-def requestTransfer(addr,port,pattern,phrase,ftsAddr,localport,verbose):
-	try:
-		sock = makeUDP(localport,True)
-		crafter = PacketCrafter()
-		requestPacket = crafter.craftRequest(addr,port,pattern,phrase)
-		for ftsPort in range(16000,16001): #range(16000,17001):
-			if ftsPort%100 == 0 and not verbose and ftsPort != 16000:
-				print("Trying to connect... 16000 - ",ftsPort,"unavailable")
-			if verbose:
-				print("Trying port ",ftsPort,". . . ")
-#			request = IP(dst=ftsAddr) / UDP(sport=65534,dport=ftsPort) / requestPacket
-			addrBytes = crafter.convertAddr(addr).to_bytes(4,byteorder='big')
-			portBytes = int(port).to_bytes(2,byteorder='big')
-			lenBytes = len(pattern).to_bytes(2,byteorder='big')
-			patternBytes = bytes(pattern,'us-ascii')
-			phraseBytes = bytes(phrase,'us-ascii')
-			sock.sendto(b'\x00'+addrBytes+portBytes+lenBytes+patternBytes+phraseBytes,(ftsAddr,ftsPort))
-			try:
-				response,(respAddr,respPort) = sock.recvfrom(1450)
-			except socket.timeout:
-				time.sleep(1000)
-			if ((respAddr != addr) or (respPort != ftsPort)):
-				continue
-			if response:
-				print("Connection established!")
-				return response, respPort
-			if verbose:
-				print("Timed out...")
-		return None
-	except Exception as err:
-		print(err+"\nBye!")
-		sys.exit(0);
 
 # Function to validate that a provided IP address is valid
 ## Returns true if valid, false if not

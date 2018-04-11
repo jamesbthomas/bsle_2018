@@ -6,7 +6,7 @@ file_loc = os.path.dirname(os.path.realpath(__file__))
 headers_dir = "/".join(file_loc.split("/")[:-1])+"/src/headers"
 sys.path.append(headers_dir)
 try:
-	from packetCrafter import *
+	from udpHandler import *
 	from encoder import *
 	from fileHandler import *
 	from tcpHandler import *
@@ -20,7 +20,7 @@ def main(opts):
 	pattern = None
 	port = None
 	destination = None
-	crafter = PacketCrafter()
+	udp = UDPHandler()
 	handler = FileHandler()
 	verbose = False
 

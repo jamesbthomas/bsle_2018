@@ -1,32 +1,29 @@
-# Python3 Source File for the PacketCrafter class used to craft packets for the custom communication protocol and supporting functions
+# Python3 Source File for the UDPHandler class used to craft packets for the custom communication protocol and supporting functions
 # Assume all input validated before being passed to PacketCrafter
 from scapy.all import *
 from struct import *
 import socket
+from encoder import *
 
-class PacketCrafter:
-	'Packet Crafter for custom communication protocol'
+class UDPHandler:
 
 	# UDP Packet Section
 	def craftRequest(self,addr,port,pattern,phrase):
 		# Craft Packet Type 0x00
-		pkt = Request()
-		pkt.packetType = 0
-		pkt.fssAddress = self.convertAddr(addr)
-		if int(port) > 65535 or int(port) < 1:
-			print("Error: Invalid port number")
-			pkt.fssPort = None
-		else:
-			pkt.fssPort = int(port)
-		pkt.patternLength = len(pattern)
+		addrCheck = self.convertAddr(addr)
+		if addrCheck == None:
+			return None
+		addrBytes = addrCheck.to_bytes(4,byteorder='big')
+		if int(port) < 1 or int(port)>65535:
+			return None
+		portBytes = int(port).to_bytes(2,byteorder='big')
 		if not patternValidate(pattern):
 			return None
-		pkt.pattern = pattern
-		pkt.message = phrase
-		if pkt.fssAddress == None or pkt.fssPort == None or pkt.pattern == None:
-			return None
-		else:
-			return pkt
+		lenBytes = len(pattern).to_bytes(2,byteorder='big')
+		patternBytes = bytes(pattern,'us-ascii')
+		phraseBytes = bytes(phrase,'us-ascii')
+		pkt = b'\x00'+addrBytes+portBytes+lenBytes+patternBytes+phraseBytes
+		return pkt
 
 	def unpackInit(self,pkt):
 		# Unpack Packet Type 0x01
@@ -36,6 +33,7 @@ class PacketCrafter:
 			print("Error: Invalid Packet Type")
 			return None
 		return pkt.load[1:],pkt[IP].src,pkt[UDP].sport
+		# TODO see if this is necessary from the FSS side
 
 	def convertAddr(self,addr):
 		# Convert an IP address from a string to a number that can be put into the packet
@@ -59,14 +57,8 @@ class PacketCrafter:
 
 	def craftResponse(self,port,message):
 		# Craft Packet type 0x02/0x03
-		# Takes the encrypted validation message and port to initiate the TCP transfer on
-		pkt = Response()
-		if port < 1 or port > 65535:
-			print("Error: Invalid Port Number")
-			return None
-		pkt.tcpPort = port
-		pkt.validation = message
-		return pkt
+		# TODO modify to match new algorithm
+		return None
 
 	def unpackValidation(self,pkt,message):
 		# Unpack Packet Type 0x03
@@ -84,31 +76,6 @@ class PacketCrafter:
 			print("Error: Could not validate response - incorrect validation message")
 			return None
 		return tcpPort
-
-class Request(Packet):
-	# Packet Type 0x00 - C2 -> FTS
-	name = "FTRequest"
-	fields_desc = [ByteField("packetType",0),
-			IntField("fssAddress",0),
-			ShortField("fssPort",0),
-			ShortField("patternLength",0),
-			StrLenField("pattern",""),
-			StrLenField("message","") ]
-
-	def bytes(self):
-		# Test function used to extract the byte string representing this layer
-		return True
-
-class Response(Packet):
-	# Packet Type 0x02 - FSS -> FTS
-	name = "FTResponse"
-	fields_desc = [ByteField("packetType",2),
-			ShortField("tcpPort",0),
-			StrLenField("validation","") ]
-
-	def payload(self):
-		# Test function used to extract the byte string representing this layer
-		return self.packetType
 
 # Function to create a UDP socket on the provided port
 ## Return Value - the socket object on success, None otherwise
@@ -137,7 +104,35 @@ def patternValidate(pattern):
 			return 0
 	return 1
 
+# Function to send the request packet to the FTS and receive the validation packet
+## Returns the validation packet (type 0x03) if the connection was successful, None otherwise
+def requestTransfer(addr,port,pattern,phrase,ftsAddr,localport,verbose):
+	try:
+		sock = makeUDP(localport,True)
+		udp = UDPHandler()
+		pkt = udp.craftRequest(addr,port,pattern,phrase)
+		for ftsPort in range(16000,17001):
+			if ftsPort%100 == 0 and not verbose and ftsPort != 16000:
+				print("Trying to connect . . . current port = ",ftsPort)
+			elif verbose:
+				print("Trying port ",ftsPort," . . . ")
+			sock.sendto(pkt,(ftsAddr,ftsPort))
+			try:
+				response,(respAddr,respPort) = sock.recvfrom(1450)
+			except socket.timeout:
+				continue
+			if ((respAddr != ftsAddr) or (respPort != ftsPort)):
+				continue
+			if response:
+				print("Validation Received!")
+				return response
+			if verbose:
+				print("Timed out...")
+		return None
+	except Exception as err:
+		print(err+"\nBye!")
+		sys.exit(2)
+
 # Used for dev testing
 if __name__ == "__main__":
-	pc = PacketCrafter()
-	print(pc.craftRequest("127.0.0.1",1111,"~:2~:2","pass").pattern)
+	print("running")
