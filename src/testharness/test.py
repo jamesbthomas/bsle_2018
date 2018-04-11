@@ -182,18 +182,18 @@ class DecodeTestCase(DefaultTestCase):
 class CraftRequestTestCase(DefaultTestCase):
 
 	def runTest(self):
-		firstTest = self.udp.craftRequest("127.0.0.1","1111","~:40;rol1:120","firstTest")
-		firstPkt = b'\x00'+self.udp.convertAddr("127.0.0.1").to_bytes(4,byteorder='big')+int("1111").to_bytes(2,byteorder='big')+len("~:40;rol1:120").to_bytes(2,byteorder='big')+bytes("~:40;rol1:120",'us-ascii')+bytes("firstTest",'us-ascii')
+		firstTest = self.udp.craftRequest("127.0.0.1","1111","~:40;rol1:120","firstTest","passwd")
+		firstPkt = b'\x00'+self.udp.convertAddr("127.0.0.1").to_bytes(4,byteorder='big')+int("1111").to_bytes(2,byteorder='big')+len("~:40;rol1:120").to_bytes(2,byteorder='big')+bytes("~:40;rol1:120",'us-ascii')+len("firstTest").to_bytes(2,byteorder='big')+bytes("firstTest",'us-ascii')+bytes("passwd",'us-ascii')
 		self.assertEqual(firstTest,firstPkt)
-		secondTest = self.udp.craftRequest("127001","1111","~:40;rol1:120","secondTest")
+		secondTest = self.udp.craftRequest("127001","1111","~:40;rol1:120","secondTest","passwd")
 		self.assertEqual(secondTest,None)
-		thirdTest = self.udp.craftRequest("127.0.0.1","0","~:40;rol1:120","thirdTest")
+		thirdTest = self.udp.craftRequest("127.0.0.1","0","~:40;rol1:120","thirdTest","passwd")
 		self.assertEqual(thirdTest,None)
-		fourthTest = self.udp.craftRequest("127.0.0.1","1111","~2:40;rol1:120","fourthTest")
+		fourthTest = self.udp.craftRequest("127.0.0.1","1111","~2:40;rol1:120","fourthTest","passwd")
 		self.assertEqual(fourthTest,None)
-		fifthTest = self.udp.craftRequest("127.0.0.1","1111","~:40rol1:120","fifthTest")
+		fifthTest = self.udp.craftRequest("127.0.0.1","1111","~:40rol1:120","fifthTest","passwd")
 		self.assertEqual(fifthTest,None)
-		sixthTest = self.udp.craftRequest("127.0.0.1","1111","~:40;rol1120","sixthTest")
+		sixthTest = self.udp.craftRequest("127.0.0.1","1111","~:40;rol1120","sixthTest","passwd")
 		self.assertEqual(sixthTest,None)
 
 class CraftResponseTestCase(DefaultTestCase):

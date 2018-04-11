@@ -8,21 +8,30 @@ from encoder import *
 class UDPHandler:
 
 	# UDP Packet Section
-	def craftRequest(self,addr,port,pattern,phrase):
+	def craftRequest(self,addr,port,pattern,phrase,name):
 		# Craft Packet Type 0x00
+		# Field 1 - Address of the FSS
 		addrCheck = self.convertAddr(addr)
 		if addrCheck == None:
 			return None
 		addrBytes = addrCheck.to_bytes(4,byteorder='big')
+		# Field 2 - Port on the FSS
 		if int(port) < 1 or int(port)>65535:
 			return None
 		portBytes = int(port).to_bytes(2,byteorder='big')
+		# Field 3 - Length of Encoding Pattern
 		if not patternValidate(pattern):
 			return None
-		lenBytes = len(pattern).to_bytes(2,byteorder='big')
+		pattLenBytes = len(pattern).to_bytes(2,byteorder='big')
+		# Field 4 - Encoding Pattern
 		patternBytes = bytes(pattern,'us-ascii')
+		# EXTRA Field 5 - Length of validation message
+		phraseLenBytes = len(phrase).to_bytes(2,byteorder='big')
+		# Field 6 - Validation Message
 		phraseBytes = bytes(phrase,'us-ascii')
-		pkt = b'\x00'+addrBytes+portBytes+lenBytes+patternBytes+phraseBytes
+		# EXTRA Field 7 - Destionation File Name
+		nameBytes = bytes(name,'us-ascii')
+		pkt = b'\x00'+addrBytes+portBytes+pattLenBytes+patternBytes+phraseLenBytes+phraseBytes+nameBytes
 		return pkt
 
 	def unpackInit(self,pkt):

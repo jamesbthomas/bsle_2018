@@ -90,17 +90,34 @@ int scrapePattern(Pattern * parsed, unsigned char * pkt){
 }
 
 // Scrapes the message out of the packet and stores it in the provided pointer
-// Also crafts the Init message and stores it in the provided pointer
+// Also scrapes the filename before crafting the Init message and storing it in the provided pointer
 // Returns the length of the message
 int scrapeMessage(unsigned char * message,unsigned char * pkt,int start,int size, Pattern * parsed,unsigned char * init){
-	int len;
-	for (len = 0;len < size-start;len++){
-		message[len] = pkt[len+start];
+	// Get the Message
+	int len = pkt[start+1] | pkt[start] << 8;
+	for (int i = 0;i < len;i++){
+		message[i] = pkt[i+start+2];
 	}
+	// Grab the file name
+	unsigned char * filename = calloc(size-len-start,sizeof(unsigned char));
+	for (int x = 0;x < size-len-start;x++){
+		filename[x] = pkt[x+len+start];
+	}
+	// Craft init
+	 // Packet type 0x01
 	init[0] = 0x01;
+	 // encode the message
 	unsigned char * encoded = encode(message,parsed);
-	memcpy(init+1,encoded,len);
+	 // copy the message length into the packet
+	init[1] = len >> 8;
+	init[2] = len & 0xff;
+	 // copy the message into the packet
+	memcpy(init+3,encoded,len);
+	 // copy the filename into the packet
+	memcpy(init+3+len,filename,size-len-start);
+	// free
 	free(encoded);
+	free(filename);
 	return len;
 }
 

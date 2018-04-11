@@ -94,7 +94,7 @@ def main(opts,args):
 				if not handler.fileValidate(file):
 					sys.exit(1)
 			except IndexError as err:
-				print("Error parsing command line options: "+str(err))
+				print("ERROR parsing command line options: "+str(err))
 				sys.exit(1)
 
 	parts = socket.split(":")
@@ -135,14 +135,14 @@ def main(opts,args):
 	# Add a now valid FSS to the whitelist
 	if not handler.contains(file_loc+"/IPAddWhiteList",addr):
 		if handler.add(file_loc+"/IPAddWhiteList",addr+","+fssPort+","+pattern) != len(addr+","+fssPort+","+pattern+"\n"):
-			print("Error: Internal - Failed to add to IPAddWhiteList")
+			print("ERROR: Internal - Failed to add to IPAddWhiteList")
 			sys.exit(2)
 
 	# Data Transfer
 	tcp = TCPHandler(ftsAddr,tcpPort,verbose)
 		## TCP Three-way Handshake
 	if not tcp.handshake():
-		print("Error: TCP Handshake Failed")
+		print("ERROR: TCP Handshake Failed")
 		sys.exit(4)
 
 	## Data transfer
@@ -164,8 +164,8 @@ def choose(pattern):
 			for line in f:
 				parts=line.split(",")
 				if len(parts) != 3:
-					print("Internal Error: IPAddWhiteList Misformatted")
-					sys.exit(3)
+					print("WARNING: IPAddWhiteList Entry Misformatted")
+					continue
 				if parts[2].rstrip() == pattern:
 					output.append("   "+str(num)+")\t"+parts[0]+":"+parts[1]+"\t"+parts[2]+"\n")
 					num += 1
@@ -235,21 +235,21 @@ def help():
 def socketValidate(socket):
 	parts = socket.split(":")
 	if (len(parts) != 2):
-		print("Error: Invalid Socket Format")
+		print("ERROR: Invalid Socket Format")
 		return False
 	# Check IP Address
 	if not addrValidate(parts[0]):
 		return False
 	# Check Port Number
 	if (int(parts[1]) > 65535 or int(parts[1]) < 1):
-		print("Error: Invalid Port Number")
+		print("ERROR: Invalid Port Number")
 		return False
 	return True
 
 if __name__ == "__main__":
 	# Check permissions
 	if os.geteuid() != 0:
-		print("Error: Must be run as superuser")
+		print("ERROR: Must be run as superuser")
 		usage()
 		sys.exit(0)
 	# Global Variables to mark the session as interactive and/or verbose
