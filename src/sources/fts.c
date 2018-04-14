@@ -18,8 +18,10 @@
 #define TOTAL_SOCKETS 1001 // Total number of sockets you want to create, should be (high port) - (low port) + 1
 #define MAX_SIZE 1450	// Maximum expected message size
 #define TIMEOUT 9000	// timeout for sockets
+#define MAX_CMD 100	// max size of a cmd prompt command
 
 void * transferSession(void * in);
+void * listener(void * in);
 typedef struct Session{
 	int sport;	// Port on the C2
 	int dport;	// Port on the FTS
@@ -34,9 +36,20 @@ pthread_mutex_t sockets_lock;
 int * sockets;
 pthread_mutex_t log_lock;
 char * logfile;
+pthread_t * tids;
+int currThread;
 fd_set fds;
 
+pthread_mutex_t numthrd_lock;
+int numthrds;
+
+pthread_mutex_t ready_lock;
+int ready;
+
 int main(int argc, char ** argv){
+	pthread_mutex_lock(&ready_lock);
+	ready = 0;
+	pthread_mutex_unlock(&ready_lock);
 	// Create an array to hold the file descriptors
 	sockets = calloc(TOTAL_SOCKETS,sizeof(int));
 	// Find the path to the log file
@@ -54,6 +67,64 @@ int main(int argc, char ** argv){
 	char time_str[30];
 	strftime(time_str,30,"ftsLogs/fts_%d-%m-%y.log",tm_info);
 	memcpy(logfile+strlen(logfile)-3,time_str,strlen(time_str));
+	// Create an array to track the thread IDs
+	tids = calloc(TOTAL_SOCKETS,sizeof(pthread_t));
+	pthread_mutex_lock(&numthrd_lock);
+	numthrds = 1;
+	pthread_mutex_unlock(&numthrd_lock);
+	pthread_create(&tids[0],NULL,listener,NULL);
+	while (!ready){
+		continue;
+	}
+	char * cmd = calloc(MAX_CMD,sizeof(char));
+	while (1){
+		fprintf(stdout,"fts> ");
+		fgets(cmd,MAX_CMD,stdin);
+		if (strncmp(cmd,"log ",4) == 0){
+			printf(" -- Prototype for reading the log for specific parameters\n");
+		}
+		else if (strncmp(cmd,"head ",5) == 0){
+			printf(" -- Prototype for reading the most recent n entries from the log\n");
+		}
+		else if (strncmp(cmd,"exit\n",5) == 0){
+			printf("Closing threads . . . ");
+			pthread_mutex_lock(&ready_lock);
+			ready = 0;
+			pthread_mutex_unlock(&ready_lock);
+			pthread_mutex_lock(&numthrd_lock);
+			for (int i = 0;i < numthrds;i++){
+				pthread_join(tids[i],NULL);
+			}
+			pthread_mutex_unlock(&numthrd_lock);
+			printf("done!\n");
+			free(tids);
+			free(logfile);
+			free(path);
+			free(sockets);
+			free(cmd);
+			exit(0);
+		}
+		else if (strncmp(cmd,"status",6) == 0){
+			pthread_mutex_lock(&numthrd_lock);
+			printf("Active Connections - %d\n",numthrds-1);
+			pthread_mutex_unlock(&numthrd_lock);
+			pthread_mutex_lock(&ready_lock);
+			if (!ready){
+				printf("WARNING - Listener not active\n");
+			}
+			else {
+				printf("Listener is active\n");
+			}
+			pthread_mutex_unlock(&ready_lock);
+		}
+		else {
+			printf("Unrecognized Command - %s",cmd);
+		}
+	}
+}
+
+// Function called to manage the UDP Listeners and allow main to take commands indepedent of the operation of the server
+void * listener(void * in){
 	// Create the struct to hold the timeout
 	struct timeval t;
 	memset(&t,0,sizeof(t));
@@ -62,17 +133,18 @@ int main(int argc, char ** argv){
 	for (int i = 0;i < TOTAL_SOCKETS;i++){
 		int s = makeSocket(i,&t);
 		if (s == -1){
-			return -1;
+			perror("Listener - Make Failure");
+			return NULL;
 		}
 		sockets[i] = s;
 	}
 	// track the last created file descriptor
 	int maxfd = sockets[TOTAL_SOCKETS-1];
-	// Create an array to track the thread IDs
-	pthread_t * tids = calloc(TOTAL_SOCKETS,sizeof(pthread_t));
-	int currThread = 0;
+	pthread_mutex_lock(&ready_lock);
+	ready = 1;
+	pthread_mutex_unlock(&ready_lock);
 	printf("Ready for connections...\n");
-	while (1) {
+	while (ready) {
 		// Zero out the statuses
 		FD_ZERO(&fds);
 		// Add each file descriptor to the set
@@ -115,13 +187,12 @@ int main(int argc, char ** argv){
 				newSession->size = n;
 				newSession->sockNum = x;
 				// Spin off a thread to handle this
-				pthread_create(&tids[currThread],NULL,transferSession,(void *) newSession);
-				pthread_detach(tids[currThread]);
+				pthread_mutex_lock(&numthrd_lock);
+				pthread_create(&tids[numthrds],NULL,transferSession,(void *) newSession);
+				pthread_detach(tids[numthrds]);
+				numthrds += 1;
+				pthread_mutex_lock(&numthrd_lock);
 				free(dgram);
-				currThread += 1;
-				if (currThread > TOTAL_SOCKETS-1){
-					currThread = 0;
-				}
 				// Remove one from the number of sockets we're looking for
 				rcvd -= 1;
 				// If we've found them all, break out and go back to listening
@@ -131,11 +202,14 @@ int main(int argc, char ** argv){
 			}
 		}
 	}
-	return 0;
+	return NULL;
 }
 
 // Function called to send the type 0x01 message, receive the 0x02 message, send the 0x03 message, and conduct the TCP data transfer
 void * transferSession(void * in){
+	pthread_mutex_lock(&numthrd_lock);
+	numthrds += 1;
+	pthread_mutex_unlock(&numthrd_lock);
 	// Grab the start time for the log
 	time_t start = time(0);
 	char * start_str = ctime(&start);
@@ -157,6 +231,8 @@ void * transferSession(void * in){
         if (s->packet[0] != 0){
                 // Not packet type 0x00
 		printf("Error: Invalid Packet Type\n");
+		free(s->packet);
+		free(s);
 		threadClose(socketsIndex,sock);
                 return NULL;
         }
@@ -165,6 +241,7 @@ void * transferSession(void * in){
 	if (scrapeAddr(fssAddr,s->packet)){
 		printf("Error: Invalid IP Address\n");
 		free(s->packet);
+		free(s);
 		free(fssAddr);
 		threadClose(socketsIndex,sock);
 		return NULL;
@@ -176,6 +253,7 @@ void * transferSession(void * in){
 		printf("Error: Invalid Port Number\n");
 		free(fssAddr);
 		free(s->packet);
+		free(s);
 		threadClose(socketsIndex,sock);
                 return NULL;
         }
@@ -188,6 +266,7 @@ void * transferSession(void * in){
 		free(fssAddr);
 		free(parsed);
 		free(s->packet);
+		free(s);
 		threadClose(socketsIndex,sock);
                 return NULL;
         }
@@ -196,6 +275,7 @@ void * transferSession(void * in){
 	unsigned char * init = calloc(1+(s->size-(patternLen+9)),sizeof(unsigned char));
 	int messageLen = scrapeMessage(message,s->packet,patternLen+9,s->size,parsed,init);
 	free(s->packet);
+	free(s);
         // Send Init
 	  // setup the destination information
 	struct sockaddr_in fss;
@@ -410,5 +490,8 @@ void threadClose(int socketsIndex, int sock){
 	pthread_mutex_lock(&sockets_lock);
 	sockets[socketsIndex] = sock;
 	pthread_mutex_unlock(&sockets_lock);
+	pthread_mutex_lock(&numthrd_lock);
+	numthrds -= 1;
+	pthread_mutex_unlock(&numthrd_lock);
 	FD_SET(sock,&fds);
 }
