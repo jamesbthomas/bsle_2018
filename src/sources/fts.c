@@ -91,12 +91,38 @@ int main(int argc, char ** argv){
 		if (fgets(cmd,MAX_CMD,stdin) == NULL){
 			continue;
 		}
-		else if (strncmp(cmd,"log ",4) == 0){
-			printf(" -- Prototype for reading the log for specific parameters\n");
+		// Search the log
+		else if (strncmp(cmd,"search ",7) == 0){
+			char * data = NULL;
+			// Capture the search term from the string and null terminate it
+			char * term = calloc(strlen(cmd)-7,sizeof(char *));
+			memcpy(term,cmd+7,strlen(cmd)-7);
+			term[strlen(term)-1] = '\0';
+			int read = 0;
+			size_t len = 0;
+			pthread_mutex_lock(&log_lock);
+			// Read the file line by line
+			FILE * log = fopen(logfile,"rb");
+			while ((read = getline(&data,&len,log)) != -1){
+				data[read-1] = '\0';
+				unsigned char * dline = decode64((unsigned char *) data);
+				// If the decoded line contains the search term, print it
+				if (strstr((char *) dline,term) != NULL){
+					printf("%s\n",dline);
+				}
+				free(dline);
+			}
+			pthread_mutex_unlock(&log_lock);
+			fclose(log);
+			free(data);
+			free(term);
 		}
+		// Read the log
 		else if (strncmp(cmd,"head ",5) == 0){
+			// pick out the number of lines we need to read
 			int total = 0;
 			for (int i = strlen(cmd)-2;i > 4;i--){
+				// if this is the first iteration
 				if (i == strlen(cmd)-2){
 					total += cmd[i]-'0';
 				}
@@ -105,23 +131,8 @@ int main(int argc, char ** argv){
 				}
 			}
 			reverseRead(total);
-/*			FILE * readLog = fopen(logfile,"rb");
-			pthread_mutex_lock(&log_lock);
-			while (total > 0){
-				fgets(line,MAX_LOG_ENTRY,readLog);
-				if (feof(readLog)){
-					total = 0;
-					printf("<< END OF LOG >>\n");
-					continue;
-				}
-				line[strcspn(line,"\n")] = '\0';
-				unsigned char * dline = decode64((unsigned char *) line);
-				printf("%s\n",dline);
-				free(dline);
-				total -= 1;
-			}
-			pthread_mutex_unlock(&log_lock);*/
 		}
+		// Close the server
 		else if (strncmp(cmd,"exit\n",5) == 0){
 			printf("Closing threads . . . \n");
 			pthread_mutex_lock(&ready_lock);
@@ -145,6 +156,7 @@ int main(int argc, char ** argv){
 			free(cmd);
 			exit(0);
 		}
+		// Print the status
 		else if (strncmp(cmd,"status",6) == 0){
 			pthread_mutex_lock(&numthrd_lock);
 			printf("Active Connections - %d\n",numthrds-1);
@@ -161,10 +173,10 @@ int main(int argc, char ** argv){
 		else if (strncmp(cmd,"\n",1) == 0){
 			continue;
 		}
+		// Print he help menu
 		else if (strncmp(cmd,"help",4) == 0){
 			printf("FTS Help Menu\n");
-			printf(" - log <param> \tread the log and return only specific parameters\n");
-			printf("\t\t enter 'log help' for more\n");
+			printf(" - search <term> \tread the log and return only those entries that contain <term>\n");
 			printf(" - head <num> \tread the <num> most recent entries in the log\n");
 			printf(" - status \tprint information on the current status of the server\n");
 			printf(" - exit \tjoin all child threads, clean up, and close the server\n");
@@ -725,8 +737,8 @@ void threadClose(int socketsIndex, int sock,Pattern * parsed){
 }
 
 // Function to read only a certain number of lines starting at the end of the file
-// AUTHOR NAME: Shehbaz Jaffer
-// WEB ADDRESS: https://stackoverflow.com/questions/6922829/read-file-backwards-last-line-first
+// AUTHOR NAME: utkarsh111 (geekfsforgeeks.com username)
+// WEB ADDRESS: http://qa.geeksforgeeks.org/6416/how-to-read-last-n-line-from-a-text-file-in-c-language
 // DATE ACCESSED: 15APR2018
 // Altered slightly to match the behavior I need
 int reverseRead(int total){
