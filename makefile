@@ -37,11 +37,11 @@ objects:
 debug:
 # Builds with debugging symbols
 	@echo "NOTICE - debugging optimized for GDB"
-	-gcc -g -c $(SRCDIR)encoder.c -o $(SRCDIR)encoder.o $(WARN)
-	-gcc -g -c $(SRCDIR)udpHandler.c -o $(SRCDIR)udpHandler.o $(WARN)
-	-gcc -g -c $(SRCDIR)tcpHandler.c -o $(SRCDIR)tcpHandler.o $(WARN)
-	-gcc -g -c $(TSTDIR)test.c -o $(TSTDIR)test.o $(WARN)
-	-gcc -g -c $(SRCDIR)fts.c -o $(SRCDIR)fts.o $(WARN)
+	-gcc -static -g -c $(SRCDIR)encoder.c -o $(SRCDIR)encoder.o $(WARN)
+	-gcc -static -g -c $(SRCDIR)udpHandler.c -o $(SRCDIR)udpHandler.o $(WARN)
+	-gcc -static -g -c $(SRCDIR)tcpHandler.c -o $(SRCDIR)tcpHandler.o $(WARN)
+	-gcc -static -g -c $(TSTDIR)test.c -o $(TSTDIR)test.o $(WARN)
+	-gcc -static -g -c $(SRCDIR)fts.c -o $(SRCDIR)fts.o $(WARN)
 
 buildAll: debug
 # Builds with debug information and leaves object files

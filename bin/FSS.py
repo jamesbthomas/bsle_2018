@@ -53,30 +53,45 @@ def main(opts):
 		sys.exit(2)
 
 	try:
+		# Loop to keep the server up and running
 		while True:
-			try:
-				while True:
-					pkt, (ftsAddr,ftsPort)  = sock.recvfrom(1450)
-					message,filename = udp.unpackInit(pkt)
-					if message != None and filename != None:
-						if verbose:
-							print("Received message from {0}:{1} - {2}".format(ftsAddr,ftsPort,message))
-						break
-			except KeyboardInterrupt: # Round-about way to keyboard interrupt the sniff
-				# CTRL+C will stop sniff but not throw the Interrupt into the main thread
-				# If you CTRL+C, then it will IndexError when trying to index into the packets that were sniffed
-				print("\nBye!")
-				sys.exit(0)
+			# Loop until we get a reqeust to save a new file
+			while True:
+				try:
+					# Loop until we get a 0x01 packet
+					while True:
+						pkt, (ftsAddr,ftsPort)  = sock.recvfrom(1450)
+						message,filename = udp.unpackInit(pkt)
+						if message != None and filename != None:
+							if verbose:
+								print("Received message from {0}:{1} - {2} - {3}".format(ftsAddr,ftsPort,message,filename))
+							break
+				except KeyboardInterrupt: # Round-about way to keyboard interrupt the sniff
+					# CTRL+C will stop sniff but not throw the Interrupt into the main thread
+					# If you CTRL+C, then it will IndexError when trying to index into the packets that were sniffed
+					print("\nBye!")
+					sys.exit(0)
 
-			decoded = encoder.decode(message[1:]) # self.plainBytes.decode() utf-8 cant decode 0x8f in position 0
+				# Verify that the filename is available for this transfer
+				if handler.fileValidate(filename):
+					# Send packet type 0x04
+					if verbose:
+						print("File name exists - sending type 0x04")
+					sock.sendto(b'\x04',(ftsAddr,ftsPort))
+					continue
+				else:
+					break
+
+
+			decoded = encoder.decode(message)
 			if (decoded == None):
 				print("Error: Could not decode message")
 				sys.exit(2)
 			recoded = encoder.encode(decoded)
 			if verbose:
-				print(message[1:],"->",decoded,"->",recoded)
+				print(message,"->",decoded,"->",recoded)
 
-			if message[1:] != recoded:
+			if message != recoded:
 				print("Error: Decode/Recode Failure")
 				sys.exit(2)
 
@@ -94,7 +109,7 @@ def main(opts):
 			if verbose:
 				print("Waiting for file...")
 
-			tcp = TCPHandler(ftsAddr,-1,verbose)
+			tcp = TCPHandler(ftsAddr,-1,pattern,verbose)
 			s,src = tcpSock.accept()
 			s.settimeout(0.5)
 
@@ -103,7 +118,7 @@ def main(opts):
 				sys.exit(0)
 
 			# Receive the file
-			rcvd = tcp.recvFile(s)
+			rcvd = tcp.recvFile(s,filename)
 			if rcvd < 1:
 				print("Receive Failure")
 				sys.exit(2)

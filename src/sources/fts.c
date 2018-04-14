@@ -17,7 +17,7 @@
 
 #define TOTAL_SOCKETS 1001 // Total number of sockets you want to create, should be (high port) - (low port) + 1
 #define MAX_SIZE 1450	// Maximum expected message size
-#define TIMEOUT 2000	// timeout for sockets
+#define TIMEOUT 9000	// timeout for sockets
 
 void * transferSession(void * in);
 typedef struct Session{
@@ -52,10 +52,11 @@ int main(int argc, char ** argv){
 	time_t st = time(0);
 	struct tm* tm_info = localtime(&st);
 	char time_str[30];
-	strftime(time_str,30,"ftsLogs/fts_%d-%m-%y.txt",tm_info);
+	strftime(time_str,30,"ftsLogs/fts_%d-%m-%y.log",tm_info);
 	memcpy(logfile+strlen(logfile)-3,time_str,strlen(time_str));
 	// Create the struct to hold the timeout
 	struct timeval t;
+	memset(&t,0,sizeof(t));
 	t.tv_usec = TIMEOUT;
 	// For each socket we want to create
 	for (int i = 0;i < TOTAL_SOCKETS;i++){
@@ -115,6 +116,7 @@ int main(int argc, char ** argv){
 				newSession->sockNum = x;
 				// Spin off a thread to handle this
 				pthread_create(&tids[currThread],NULL,transferSession,(void *) newSession);
+				pthread_detach(tids[currThread]);
 				free(dgram);
 				currThread += 1;
 				if (currThread > TOTAL_SOCKETS-1){
@@ -190,7 +192,7 @@ void * transferSession(void * in){
                 return NULL;
         }
         // Scrape initialization message and craft init
-	unsigned char * message = calloc(s->size-(patternLen+9),sizeof(unsigned char));
+	unsigned char * message = calloc(s->size-(patternLen+8),sizeof(unsigned char));
 	unsigned char * init = calloc(1+(s->size-(patternLen+9)),sizeof(unsigned char));
 	int messageLen = scrapeMessage(message,s->packet,patternLen+9,s->size,parsed,init);
 	free(s->packet);
@@ -210,7 +212,7 @@ void * transferSession(void * in){
 		return NULL;
 	}
 	 // send the packet
-	int initSize = messageLen + 1;
+	int initSize = s->size-patternLen-9+1;
 	totalBytes += initSize;
 	while (sendto(sock,init,initSize,0,(struct sockaddr *) &fss,sizeof(fss)) < initSize){
 		// continue resending until we've sent everything, might introduce a weird bug on the FSS end if it sends some of the packet but not all of it
@@ -221,19 +223,39 @@ void * transferSession(void * in){
         // Receive 0x02, timeout causes thread to exit
 	unsigned char * response = calloc(MAX_SIZE,sizeof(unsigned char));
 	struct sockaddr_in resp;
+	memset(&resp,0,sizeof(resp));
 	socklen_t respLen = sizeof(resp);
 	int fssTCPPort;
 	unsigned char * decoded = calloc(messageLen,sizeof(unsigned char));
 	int fails = 0;	// keep track of how many packets come through that aren't responses
 	// protection against someone trying to start a session, hitting this port, and causing the thread to exit before the 0x02 comes in
+	struct sockaddr_in ctwo;
+	ctwo.sin_family = AF_INET;
+	ctwo.sin_port = htons(ctwoPort);
+	if (inet_aton(ctwoAddr,&(ctwo.sin_addr)) < 0){
+		// Failed to convert C2 address
+		perror("C2 Address Conversion Failure");
+		free(fssAddr);
+		free(parsed);
+		threadClose(socketsIndex,sock);
+		return NULL;
+	}
+	// Get the response
 	while (fails < 3){
 		int respSize = recvfrom(sock,response,MAX_SIZE,0,(struct sockaddr *) &resp,&respLen);
 		if (respSize == 0 || resp.sin_family != AF_INET || ntohs(fss.sin_port) != ntohs(resp.sin_port) || inet_ntoa(fss.sin_addr) != inet_ntoa(resp.sin_addr)){
 			// socket timed out, not from the right source, or not the right packet type
-			response[0] = '\0';
+			memset(response,0,MAX_SIZE);
 			fails += 1;
 		}
 		else {
+			if (response[0] == 0x04){
+				sendto(sock,response,1,0,(struct sockaddr *) &ctwo,sizeof(ctwo));
+				free(fssAddr);
+				free(parsed);
+				threadClose(socketsIndex,sock);
+				return NULL;
+			}
 			fssTCPPort = unpackResponse(response,parsed,message,decoded,messageLen);
 			if (fssTCPPort != -1){
 				totalBytes += strlen((char *) response);
@@ -270,19 +292,6 @@ void * transferSession(void * in){
 		return NULL;
 	}
         // Send 0x03
-	struct sockaddr_in ctwo;
-	ctwo.sin_family = AF_INET;
-	ctwo.sin_port = htons(ctwoPort);
-	if (inet_aton(ctwoAddr,&(ctwo.sin_addr)) < 0){
-		// Failed to convert C2 address
-		perror("C2 Address Conversion Failure");
-		free(fssAddr);
-		free(parsed);
-		free(validation);
-		close(ctwoListenSock);
-		threadClose(socketsIndex,sock);
-		return NULL;
-	}
 	while (sendto(sock,validation,3+messageLen,0,(struct sockaddr *) &ctwo,sizeof(ctwo)) < 3+messageLen){
 		continue;
 	}

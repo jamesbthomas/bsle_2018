@@ -41,7 +41,7 @@ class UDPHandler:
 				return None,None
 			# Scrape the length of the message
 			messageLen = pkt[1] << 8 | pkt[2]
-			if (messageLen+3 > len(pkt)):
+			if (messageLen+3 >= len(pkt)):
 				return None,None
 			# Scrape the message
 			message = pkt[3:3+messageLen]
@@ -107,7 +107,7 @@ def makeUDP(port,timeout):
 		sock = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
 		sock.bind(('0.0.0.0',port))
 		if timeout:
-			sock.settimeout(0.1)
+			sock.settimeout(0.2)
 		return sock
 	except socket.error as err:
 		print("Error: Failed to create UDP socket - "+err)
@@ -115,12 +115,12 @@ def makeUDP(port,timeout):
 
 # Function to send the request packet to the FTS and receive the validation packet
 ## Returns the validation packet (type 0x03) if the connection was successful, None otherwise
-def requestTransfer(addr,port,pattern,phrase,ftsAddr,localport,verbose):
+def requestTransfer(addr,port,pattern,phrase,ftsAddr,localport,fname,verbose):
 	try:
 		sock = makeUDP(localport,True)
 		udp = UDPHandler()
-		pkt = udp.craftRequest(addr,port,pattern,phrase)
-		for ftsPort in range(16000,17001):
+		pkt = udp.craftRequest(addr,port,pattern,phrase,fname)
+		for ftsPort in range(16000,16005):
 			if ftsPort%100 == 0 and not verbose and ftsPort != 16000:
 				print("Trying to connect . . . current port = ",ftsPort)
 			elif verbose:
@@ -132,10 +132,24 @@ def requestTransfer(addr,port,pattern,phrase,ftsAddr,localport,verbose):
 				continue
 			if ((respAddr != ftsAddr) or (respPort != ftsPort)):
 				continue
-			if response:
+			if response[0] == 0x04:
+				print("ERROR: File already exists on FSS")
+				print("Enter a new file name below, or 'exit' to cancel")
+				try:
+					name = input("File Name: ").strip()
+					if name == "exit":
+						print("\nBye!");
+						sys.exit(0)
+				except KeyboardInterrupt:
+					print("\nBye!")
+					sys.exit(0)
+				pkt = udp.craftRequest(addr,port,pattern,phrase,name)
+				response = None
+				continue
+			elif response:
 				print("Validation Received!")
 				return response
-			if verbose:
+			elif verbose:
 				print("Timed out...")
 		return None
 	except Exception as err:

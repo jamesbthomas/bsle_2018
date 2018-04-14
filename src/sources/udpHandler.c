@@ -32,6 +32,7 @@ int makeSocket(int socketNum,struct timeval * t){
 	}
 	// Bind
 	struct sockaddr_in addr;
+	memset(&addr,0,sizeof(addr));
 	addr.sin_family = AF_INET;
 	addr.sin_port = htons(port);
 	addr.sin_addr.s_addr = INADDR_ANY;
@@ -74,18 +75,13 @@ int scrapePort(unsigned char * pkt){
 // Scrapes the pattern length and validates the encoding pattern, storing it in parsed
 // Returns the length of the pattern on success, or -1 on error
 int scrapePattern(Pattern * parsed, unsigned char * pkt){
-	int len = pkt[8] | pkt[7] << 8;
+	int len = pkt[7] << 8 | pkt[8];
 	unsigned char * pattern = calloc(len+1,sizeof(unsigned char));
-	for (int i = 0;i < len;i++){
-		pattern[i] = pkt[9+i];
-	}
-	char * charPattern = calloc(len,sizeof(char));
-	sprintf(charPattern,"%s",pattern);
-	if (patternValidate(charPattern,parsed) != 0){
+	memcpy(pattern,pkt+9,len);
+	if (patternValidate((char *) pattern,parsed) != 0){
 		return -1;
 	}
 	free(pattern);
-	free(charPattern);
 	return len;
 }
 
@@ -95,14 +91,11 @@ int scrapePattern(Pattern * parsed, unsigned char * pkt){
 int scrapeMessage(unsigned char * message,unsigned char * pkt,int start,int size, Pattern * parsed,unsigned char * init){
 	// Get the Message
 	int len = pkt[start+1] | pkt[start] << 8;
-	for (int i = 0;i < len;i++){
-		message[i] = pkt[i+start+2];
-	}
+	memcpy(message,pkt+2+start,len);
 	// Grab the file name
-	unsigned char * filename = calloc(size-len-start,sizeof(unsigned char));
-	for (int x = 0;x < size-len-start;x++){
-		filename[x] = pkt[x+len+start];
-	}
+	int fnameLen = size-len-start-2;
+	unsigned char * filename = calloc(fnameLen,sizeof(unsigned char));
+	memcpy(filename,pkt+len+start+2,fnameLen);
 	// Craft init
 	 // Packet type 0x01
 	init[0] = 0x01;
@@ -114,7 +107,8 @@ int scrapeMessage(unsigned char * message,unsigned char * pkt,int start,int size
 	 // copy the message into the packet
 	memcpy(init+3,encoded,len);
 	 // copy the filename into the packet
-	memcpy(init+3+len,filename,size-len-start);
+	printf("filename\n");
+	memcpy(init+3+len,filename,fnameLen);
 	// free
 	free(encoded);
 	free(filename);

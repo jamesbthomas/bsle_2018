@@ -6,7 +6,7 @@ from udpHandler import *
 # TODO TEST!!!!!
 class TCPHandler():
 
-	def __init__(self,dst,dport,verbose):
+	def __init__(self,dst,dport,pattern,verbose):
 		# Takes a destination address and port for all sent traffic
 		# Also takes a verbose argument to mark the session as verbose
 		self.verbose = verbose
@@ -17,6 +17,7 @@ class TCPHandler():
 		self.lastSeq = 0
 		self.nextSeq = 0
 		self.socket = None
+		self.enc = Encoder(pattern)
 
 	def handshake(self):
 		# Conducts the TCP three-way handshake with the destination and port provided at init
@@ -39,26 +40,27 @@ class TCPHandler():
 		while sent < size:
 			sent += self.socket.send(f.read())
 		if self.verbose:
-			print("Send complete - "+sent+" bytes transmitted")
+			print("Send complete -",sent,"bytes transmitted")
 		f.close()
 		return sent
 
-	def recvFile(self,sock):
+	def recvFile(self,sock,fname):
 		# Prepares to receive the file and saves it to the designated path
 		## Returns total number of bytes written to the file, -1 if failed
 		bytesRcvd = 0
-		t = time.localtime()
-		f = open(str(t.tm_hour)+str(t.tm_min)+"-"+str(t.tm_mon)+str(t.tm_mday),"wb")
+		f = open(fname,"w")
 		total = 0
 		pkt = sock.recv(1450)
 		try:
 			while(pkt != b''):
 				total += len(pkt)
-				f.write(pkt)
+				# print(self.enc.decode(pkt))
+				f.write(self.enc.decode(pkt))
 				pkt = sock.recv(1450)
 		except socket.timeout:
 			pass
-		except:
+		except Exception as err:
+			print(err)
 			return -1
 		f.close()
 		return total

@@ -67,6 +67,12 @@ def main(opts,args):
 			print("\nBye!")
 			sys.exit(0)
 
+		try:
+			destName = input("Name on the FSS: ").strip()
+		except KeyboardInterrupt:
+			print("\nBye!")
+			sys.exit(0)
+
 		socket = choose(pattern)
 
 	else:
@@ -104,7 +110,7 @@ def main(opts,args):
 
 	try:
 		while True:
-			response = requestTransfer(addr,fssPort,pattern,phrase,ftsAddr,localPort,verbose)
+			response = requestTransfer(addr,fssPort,pattern,phrase,ftsAddr,localPort,destName,verbose)
 			if response != None:
 				break
 			elif not interactive:
@@ -139,7 +145,7 @@ def main(opts,args):
 			sys.exit(2)
 
 	# Data Transfer
-	tcp = TCPHandler(ftsAddr,tcpPort,verbose)
+	tcp = TCPHandler(ftsAddr,tcpPort,pattern,verbose)
 		## TCP Three-way Handshake
 	if not tcp.handshake():
 		print("ERROR: TCP Handshake Failed")
