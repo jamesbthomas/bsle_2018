@@ -46,8 +46,8 @@ int patternValidate(char * pattern,Pattern * parsed){
 	int i;
 	char * opVal;
 	parsed->ops = (char *) calloc(parsed->numOpts,sizeof(char *));
-	parsed->vals = (int *) calloc(parsed->numOpts,sizeof(int));
-	parsed->lens = (int *) calloc(parsed->numOpts,sizeof(int));
+	parsed->vals = (int *) calloc(parsed->numOpts+1,sizeof(int));
+	parsed->lens = (int *) calloc(parsed->numOpts+1,sizeof(int));
 	for (i = 0;i < parsed->numOpts;i++){
 		opVal = strtok(strdup(parsed->opts[i]),":");
 		char * len = strtok(NULL,":");
@@ -151,7 +151,7 @@ unsigned char * encode(unsigned char * data,Pattern * parsed){
 	int currOpt = 0;
 	int size = strlen((char *) data);
 	int done = 0;
-	unsigned char * encoded = calloc(size,sizeof(unsigned char));
+	unsigned char * encoded = calloc(size+1,sizeof(unsigned char));
 	while (done < size){
 		char opt = parsed->ops[currOpt];
 		int val = parsed->vals[currOpt];
@@ -185,6 +185,7 @@ unsigned char * encode(unsigned char * data,Pattern * parsed){
 			currOpt = 0;
 		}
 	}
+	encoded[size] = '\0';
 	return encoded;
 }
 
@@ -192,9 +193,9 @@ unsigned char * encode(unsigned char * data,Pattern * parsed){
 // Returns decoded string if successful, NULL otherwise
 unsigned char * decode(unsigned char * data,Pattern * parsed){
 	int currOpt = 0;
-	int size = strlen((char *) data)-1;
+	int size = strlen((char *) data);
 	int done = 0;
-	unsigned char * decoded = calloc(size,sizeof(unsigned char));
+	unsigned char * decoded = calloc(size+1,sizeof(unsigned char));
 	while (done < size){
 		char opt = parsed->ops[currOpt];
 		int val = parsed->vals[currOpt];
@@ -228,13 +229,14 @@ unsigned char * decode(unsigned char * data,Pattern * parsed){
 			currOpt = 0;
 		}
 	}
+	decoded[size] = '\0';
 	return decoded;
 }
 
 // Function to encode a provided string using base64
 // Returns encoded string if successful, NULL otherwise
 // Used by each transfer session to create its log entry
-unsigned char * base64(unsigned char * string){
+unsigned char * encode64(unsigned char * string){
 	unsigned char dict[] = {0x41,0x42,0x43,0x44,0x45,0x46,0x47,0x48,0x49,0x4a,0x4b,0x4c,0x4d,0x4e,0x4f,
 				0x50,0x51,0x52,0x53,0x54,0x55,0x56,0x57,0x58,0x59,0x5a,0x61,0x62,0x63,0x64,
 				0x65,0x66,0x67,0x68,0x69,0x6a,0x6b,0x6c,0x6d,0x6e,0x6f,0x70,0x71,0x72,0x73,

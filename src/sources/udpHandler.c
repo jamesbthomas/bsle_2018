@@ -107,7 +107,6 @@ int scrapeMessage(unsigned char * message,unsigned char * pkt,int start,int size
 	 // copy the message into the packet
 	memcpy(init+3,encoded,len);
 	 // copy the filename into the packet
-	printf("filename\n");
 	memcpy(init+3+len,filename,fnameLen);
 	// free
 	free(encoded);
@@ -125,14 +124,12 @@ int unpackResponse(unsigned char * pkt,Pattern * parsed,unsigned char * message,
 	if (port < 1 || port > 65535){
 		return -1;
 	}
-	unsigned char * responseMsg = calloc(len,sizeof(unsigned char));
-	for (int i = 0;i < len;i++){
-		responseMsg[i] = pkt[i+3];
-	}
+	unsigned char * responseMsg = calloc(len+1,sizeof(unsigned char));
+	memcpy(responseMsg,pkt+3,len);
+	responseMsg[len] = '\0';
 	memcpy(decoded,decode(responseMsg,parsed),len);
 	if (memcmp(decoded,message,len) != 0){
 		free(responseMsg);
-		free(decoded);
 		return -1;
 	}
 	free(responseMsg);

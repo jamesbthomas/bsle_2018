@@ -261,6 +261,7 @@ void * transferSession(void * in){
 				totalBytes += strlen((char *) response);
 				break;
 			}
+			printf("here %d\n",fssTCPPort);
 			fails += 1;
 		}
 	}
@@ -311,13 +312,14 @@ void * transferSession(void * in){
 		return NULL;
 	}
 	// Write the data to a temporary file
-	char * data = calloc(MAX_SIZE,sizeof(unsigned char));
+	char * data = calloc(MAX_SIZE+1,sizeof(unsigned char));
 	char * tmpfile = calloc(11,sizeof(char));
 	sprintf(tmpfile,"/tmp/%d",tcpPort);
 	int rcvd;
 	int totalrcvd = 0;
 	FILE * temp = fopen(tmpfile,"w");
 	while ( (rcvd = read(ctwoSock,data,MAX_SIZE)) > 0){
+		data[MAX_SIZE] = '\0';
 		int res = fputs(data,temp);
 		if (res != 1){
 			perror("Write Error");
@@ -364,7 +366,7 @@ void * transferSession(void * in){
 	fclose(temp);
 	// Send the File
 	FILE * tmp = fopen(tmpfile,"rb");
-	unsigned char * raw = calloc(MAX_SIZE,sizeof(unsigned char));
+	unsigned char * raw = calloc(MAX_SIZE+1,sizeof(unsigned char));
 	int sent = 0;
 	while (sent < totalrcvd){
 		int read = fread(raw,sizeof(unsigned char),MAX_SIZE,tmp);
@@ -389,7 +391,7 @@ void * transferSession(void * in){
 	close(ctwoListenSock);
 	threadClose(socketsIndex,sock);
 	char * entry = calloc(strlen(start_str)+strlen(ctwoAddr)+strlen(fssAddr)+10,sizeof(char));
-	sprintf(entry,"%s:%s->%s:%d\n",start_str,ctwoAddr,fssAddr,totalBytes);
+	sprintf(entry,"%s:%s->%s:%d:Success\n",start_str,ctwoAddr,fssAddr,totalBytes);
 	printf("%s",entry);
 	pthread_mutex_lock(&log_lock);
 	FILE * log = fopen(logfile,"a");
