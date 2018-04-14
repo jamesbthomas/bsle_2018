@@ -8,6 +8,7 @@
 #include <ctype.h>
 #include "../headers/encoder.h"
 
+// Data structure for a parsed encoding pattern
 typedef struct pattern{
 	int numOpts;
 	int maxOpts;
@@ -16,6 +17,13 @@ typedef struct pattern{
 	int * vals;
 	int * lens;
 } Pattern;
+
+// Dictionary used for base 64 encoding/decoding
+char dict[] = {'A','B','C','D','E','F','G','H','I','J','K','L','M','N','O',
+			'P','Q','R','S','T','U','V','W','X','Y','Z','a','b','c','d',
+			'e','f','g','h','i','j','k','l','m','n','o','p','q','r','s',
+			't','u','v','w','x','y','z','0','1','2','3','4','5','6','7',
+			'8','9','+','/'};
 
 // Function to validate an encoding pattern scraped from the C2's request packet and parse it for easier use later
 // Takes the scraped pattern as a string and the Pattern object that will store the parsed pattern
@@ -237,11 +245,6 @@ unsigned char * decode(unsigned char * data,Pattern * parsed){
 // Returns encoded string if successful, NULL otherwise
 // Used by each transfer session to create its log entry
 unsigned char * encode64(unsigned char * string){
-	unsigned char dict[] = {0x41,0x42,0x43,0x44,0x45,0x46,0x47,0x48,0x49,0x4a,0x4b,0x4c,0x4d,0x4e,0x4f,
-				0x50,0x51,0x52,0x53,0x54,0x55,0x56,0x57,0x58,0x59,0x5a,0x61,0x62,0x63,0x64,
-				0x65,0x66,0x67,0x68,0x69,0x6a,0x6b,0x6c,0x6d,0x6e,0x6f,0x70,0x71,0x72,0x73,
-				0x74,0x75,0x76,0x77,0x78,0x79,0x7a,0x30,0x31,0x32,0x33,0x34,0x35,0x36,0x37,
-				0x38,0x39,0x2b,0x2f};
 	int len = strlen((char *) string);
 	unsigned char * encoded = calloc(len+(4*(len%3)),sizeof(unsigned char));
 	int enc = 0;
@@ -275,15 +278,56 @@ unsigned char * encode64(unsigned char * string){
 	return encoded;
 }
 
+// Function to decode a provided string using base64
+// Returns decoded string if successful, NULL otherwise
+// Used by the command prompt thread to query the log
+unsigned char * decode64(unsigned char * string){
+	int len = strlen((char *) string);
+	int dlen = len;
+	// if it was padded twice
+	if (string[len-1] == 61){
+		dlen -= 2;
+	}
+	// if it was padded once
+	else if (string[len] == 61){
+		dlen -= 1;
+	}
+	unsigned char * decoded = calloc(dlen,sizeof(unsigned char));
+	int plain = 0;
+	for (int enc = 0;enc < len;enc += 4){
+		if (dlen == len-1 && enc+4 == len){
+			int together = (((strchr(dict,string[enc])-dict) & 0x3f) << 18) | (((strchr(dict,string[enc+1])-dict) & 0x3f) << 12) | ((strchr(dict,string[enc+2])-dict) & 0x3f);
+			decoded[plain] = together >> 16;
+			decoded[plain+1] = together >> 8 & 0xff;
+		}
+		else if (dlen == len-2 && enc+4 == len){
+			int together = (((strchr(dict,string[enc])-dict) & 0x3f) << 18) | (((strchr(dict,string[enc+1])-dict) & 0x3f) << 12);
+			decoded[plain] = together >> 16;
+		}
+		else {
+			int together = (((strchr(dict,string[enc])-dict) & 0x3f) << 18) | (((strchr(dict,string[enc+1])-dict) & 0x3f) << 12) | (((strchr(dict,string[enc+2])-dict) & 0x3f) << 6) | ((strchr(dict,string[enc+3])-dict) & 0x3f);
+			decoded[plain] = together >> 16;
+			decoded[plain+1] = together >> 8 & 0xff;
+			decoded[plain+2] = together & 0xff;
+		}
+		plain += 3;
+	}
+	return decoded;
+}
+
 #endif
 /* Main function for interacting directly with this module
 int main(int argc,char ** argv){
-	char *data = strdup("ror9:8;^27:2"); //;~:180;rol50:34");
-	Pattern * parsed = calloc(1,sizeof(Pattern));
-	patternValidate(data,parsed);
-	for (int i = 0;i < parsed->numOpts;i++){
-		printf("%d\t",i);
-		printf("%s\t%c\t%d\t%d\n",parsed->opts[i],parsed->ops[i],parsed->vals[i],parsed->lens[i]);
-	}
+	unsigned char * pas = "pass";
+	unsigned char * encPas = calloc(8,sizeof(unsigned char));
+	encPas[0] = 0x63;
+	encPas[1] = 0x47;
+	encPas[2] = 0x46;
+	encPas[3] = 0x7a;
+	encPas[4] = 0x63;
+	encPas[5] = 0x77;
+	encPas[6] = 0x3d;
+	encPas[7] = 0x3d;
+	printf("%s\t%s\t%d\n",encPas,decode64(encPas),strlen((char *) decode64(encPas)));
 	return 0;
 }*/

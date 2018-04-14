@@ -16,6 +16,12 @@ Pattern * full;
 unsigned char * messagesFull;
 Pattern * repeat;
 unsigned char * messagesRepeat;
+char * pas;
+unsigned char * encPas;
+char * pass;
+unsigned char * encPass;
+char * passe;
+unsigned char * encPasse;
 
 Pattern * parsed;
 unsigned char * lo;
@@ -55,6 +61,33 @@ int init_enc(void){
 	messagesRepeat[5] = 0x98;
 	messagesRepeat[6] = 0x67;
 	messagesRepeat[7] = 0x71;
+
+	pas = "pas";
+	encPas = calloc(4,sizeof(unsigned char));
+	encPas[0] = 0x63;
+	encPas[1] = 0x47;
+	encPas[2] = 0x46;
+	encPas[3] = 0x7a;
+	pass = "pass";
+	encPass = calloc(8,sizeof(unsigned char));
+	encPass[0] = 0x63;
+	encPass[1] = 0x47;
+	encPass[2] = 0x46;
+	encPass[3] = 0x7a;
+	encPass[4] = 0x63;
+	encPass[5] = 0x77;
+	encPass[6] = 0x3d;
+	encPass[7] = 0x3d;
+	passe = "passe";
+	encPasse = calloc(8,sizeof(unsigned char));
+	encPasse[0] = 0x63;
+	encPasse[1] = 0x47;
+	encPasse[2] = 0x46;
+	encPasse[3] = 0x7a;
+	encPasse[4] = 0x63;
+	encPasse[5] = 0x32;
+	encPasse[6] = 0x55;
+	encPasse[7] = 0x3d;
 
 	return 0;
 }
@@ -214,6 +247,7 @@ int clean_tcp(void){
 	return 0;
 }
 
+// 	ENCODER TESTS	//
 // Function containing the tests of roll right (ror)
 void testROR(void){
 	CU_ASSERT(ror('m',1) == (unsigned char) 182);
@@ -350,22 +384,25 @@ void testDECODE(void){
 	free(mess);
 }
 
-// Function containing the tests for the base64 function
-void testBASE64(void){
+// Function containing the tests for the encode64 function
+void testENCODE64(void){
 	// Just the right length
-	char * pas = "pas";
-	unsigned char encPas[] = {0x63,0x47,0x46,0x7a};
-	CU_ASSERT(memcmp(base64((unsigned char *) pas),encPas,4) == 0);
+	CU_ASSERT(memcmp(encode64((unsigned char *) pas),encPas,4) == 0);
 	// One more
-	char * pass = "pass";
-	unsigned char encPass[] = {0x63,0x47,0x46,0x7a,0x63,0x77,0x3d,0x3d};
-	CU_ASSERT(memcmp(base64((unsigned char *) pass),encPass,8) == 0);
+	CU_ASSERT(memcmp(encode64((unsigned char *) pass),encPass,8) == 0);
 	// Two more
-	char * passe = "passe";
-	unsigned char encPasse[] = {0x63,0x47,0x46,0x7a,0x63,0x32,0x55,0x3d};
-	CU_ASSERT(memcmp(base64((unsigned char *) passe),encPasse,8) == 0);
+	CU_ASSERT(memcmp(encode64((unsigned char *) passe),encPasse,8) == 0);
 }
 
+// Function containing the tests for the decode64 function
+void testDECODE64(void){
+	// just the right length
+	CU_ASSERT(memcmp(decode64(encPas),(unsigned char *) pas,4) == 0);
+	// one more
+	CU_ASSERT(memcmp(decode64(encPass),(unsigned char *) pass,8) == 0);
+	// two more
+	CU_ASSERT(memcmp(decode64(encPasse),(unsigned char *) passe,8) == 0);
+}
 
 ///	UDP HANDLER TESTS	///
 // Function containing the tests for the makeSocket function
@@ -439,16 +476,14 @@ void testSCRAPEMESSAGE(void){
 	patternValidate(strdup("~:2;~:2"),parsed);
 	unsigned char * message = calloc(4,sizeof(unsigned char));
 	unsigned char * init = calloc(13,sizeof(unsigned char));
-	CU_ASSERT(scrapeMessage(message,lo,16,20,parsed,init) == 4);
+	unsigned char * local = calloc(28,sizeof(unsigned char));
+	CU_ASSERT(scrapeMessage(message,memcpy(local,lo,28),16,28,parsed,init) == 4);
 	unsigned char initOne[] = {0x01,0x00,0x04,0x8f,0x9e,0x8c,0x8c,0x70,0x61,0x73,0x73,0x77,0x64};
-//	printf("\n");
-//	for (int i = 0;i < 13;i++){
-//		printf("%d\t%d\n",init[i],initOne[i]);
-//	}
 	CU_ASSERT(memcmp(init,initOne,5) == 0);
 	message = realloc(message,5);
 	init = realloc(init,14);
-	CU_ASSERT(scrapeMessage(message,fs,18,23,parsed,init) == 5);
+	local = realloc(local,31);
+	CU_ASSERT(scrapeMessage(message,memcpy(local,fs,31),18,31,parsed,init) == 5);
 	unsigned char initTwo[] = {0x01,0x00,0x05,0x92,0x9e,0x8c,0x8c,0x9a,0x70,0x61,0x73,0x73,0x77,0x64};
 	CU_ASSERT(memcmp(init,initTwo,6) == 0);
 	free(message);
@@ -521,7 +556,7 @@ int main(int argc, char ** argv){
 		(NULL == CU_add_test(encSuite,"patternValidate()",testPatternValidate)) ||
 		(NULL == CU_add_test(encSuite,"encode()",testENCODE)) ||
 		(NULL == CU_add_test(encSuite,"decode()",testDECODE)) ||
-		(NULL == CU_add_test(encSuite,"base64()",testBASE64))){
+		(NULL == CU_add_test(encSuite,"encode64()",testENCODE64))){
 		CU_cleanup_registry();
 		return CU_get_error();
 	}

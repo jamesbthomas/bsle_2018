@@ -19,6 +19,7 @@ unsigned char rol(const unsigned char value, int shift);
 unsigned char * encode(unsigned char * data,Pattern * parsed);
 unsigned char * decode(unsigned char * data, Pattern * parsed);
 
-unsigned char * base64(unsigned char * string);
+unsigned char * encode64(unsigned char * string);
+unsigned char * decode64(unsigned char * string);
 
 #endif
