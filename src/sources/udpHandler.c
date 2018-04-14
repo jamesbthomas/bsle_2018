@@ -78,7 +78,10 @@ int scrapePattern(Pattern * parsed, unsigned char * pkt){
 	int len = pkt[7] << 8 | pkt[8];
 	unsigned char * pattern = calloc(len+1,sizeof(unsigned char));
 	memcpy(pattern,pkt+9,len);
-	if (patternValidate((char *) pattern,parsed) != 0){
+	char * cpattern = (char *) pattern;
+	if (patternValidate(cpattern,parsed) != 0){
+		free(parsed);
+		free(pattern);
 		return -1;
 	}
 	free(pattern);
@@ -127,7 +130,9 @@ int unpackResponse(unsigned char * pkt,Pattern * parsed,unsigned char * message,
 	unsigned char * responseMsg = calloc(len+1,sizeof(unsigned char));
 	memcpy(responseMsg,pkt+3,len);
 	responseMsg[len] = '\0';
-	memcpy(decoded,decode(responseMsg,parsed),len);
+	unsigned char * dcoded = decode(responseMsg,parsed);
+	memcpy(decoded,dcoded,len);
+	free(dcoded);
 	if (memcmp(decoded,message,len) != 0){
 		free(responseMsg);
 		return -1;

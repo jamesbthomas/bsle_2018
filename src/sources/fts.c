@@ -67,6 +67,10 @@ int main(int argc, char ** argv){
 	char time_str[30];
 	strftime(time_str,30,"ftsLogs/fts_%d-%m-%y.log",tm_info);
 	memcpy(logfile+strlen(logfile)-3,time_str,strlen(time_str));
+	// Create the file
+	FILE * log = fopen(logfile,"w");
+	fclose(log);
+	FILE * readLog = fopen(logfile,"rb");
 	// Create an array to track the thread IDs
 	tids = calloc(TOTAL_SOCKETS,sizeof(pthread_t));
 	pthread_mutex_lock(&numthrd_lock);
@@ -79,12 +83,23 @@ int main(int argc, char ** argv){
 	char * cmd = calloc(MAX_CMD,sizeof(char));
 	while (1){
 		fprintf(stdout,"fts> ");
-		fgets(cmd,MAX_CMD,stdin);
+		if (fgets(cmd,MAX_CMD,stdin) == NULL){
+			printf("%s\n",cmd);
+			continue;
+		}
 		if (strncmp(cmd,"log ",4) == 0){
 			printf(" -- Prototype for reading the log for specific parameters\n");
 		}
 		else if (strncmp(cmd,"head ",5) == 0){
-			printf(" -- Prototype for reading the most recent n entries from the log\n");
+			char * line = calloc(256,sizeof(unsigned char));
+			int total = cmd[5]-'0';
+			pthread_mutex_lock(&log_lock);
+			for (int i = 0;i < total;i++){
+				fgets(line,sizeof(line),readLog);
+				printf("%s",line);
+			}
+			pthread_mutex_unlock(&log_lock);
+			free(line);
 		}
 		else if (strncmp(cmd,"exit\n",5) == 0){
 			printf("Closing threads . . . ");
@@ -102,6 +117,7 @@ int main(int argc, char ** argv){
 			free(path);
 			free(sockets);
 			free(cmd);
+			fclose(readLog);
 			exit(0);
 		}
 		else if (strncmp(cmd,"status",6) == 0){
@@ -186,13 +202,13 @@ void * listener(void * in){
 				newSession->saddr = inet_ntoa(from.sin_addr);
 				newSession->size = n;
 				newSession->sockNum = x;
+				free(dgram);
 				// Spin off a thread to handle this
 				pthread_mutex_lock(&numthrd_lock);
 				pthread_create(&tids[numthrds],NULL,transferSession,(void *) newSession);
-				pthread_detach(tids[numthrds]);
+//				pthread_detach(tids[numthrds]);
 				numthrds += 1;
-				pthread_mutex_lock(&numthrd_lock);
-				free(dgram);
+				pthread_mutex_unlock(&numthrd_lock);
 				// Remove one from the number of sockets we're looking for
 				rcvd -= 1;
 				// If we've found them all, break out and go back to listening
@@ -214,7 +230,7 @@ void * transferSession(void * in){
 	time_t start = time(0);
 	char * start_str = ctime(&start);
 	start_str[strlen(start_str)-1] = '\0';
-	printf("Thread Start : %s\n",start_str);
+	printf("\nThread Start : %s\n",start_str);
         session * s = (session *) in;
         // Grab some admin info
         int ctwoPort = s->sport;
@@ -222,6 +238,7 @@ void * transferSession(void * in){
         char * ctwoAddr = s->saddr;
         int socketsIndex = s->sockNum;
 	int totalBytes = s->size;
+	int size = s->size;
 	// Take this socket off of the list of listeners
 	pthread_mutex_lock(&sockets_lock);
 	int sock = sockets[socketsIndex];
@@ -271,11 +288,10 @@ void * transferSession(void * in){
                 return NULL;
         }
         // Scrape initialization message and craft init
-	unsigned char * message = calloc(s->size-(patternLen+8),sizeof(unsigned char));
-	unsigned char * init = calloc(1+(s->size-(patternLen+9)),sizeof(unsigned char));
-	int messageLen = scrapeMessage(message,s->packet,patternLen+9,s->size,parsed,init);
+	unsigned char * message = calloc(size-(patternLen+8),sizeof(unsigned char));
+	unsigned char * init = calloc(1+(size-(patternLen+9)),sizeof(unsigned char));
+	int messageLen = scrapeMessage(message,s->packet,patternLen+9,size,parsed,init);
 	free(s->packet);
-	free(s);
         // Send Init
 	  // setup the destination information
 	struct sockaddr_in fss;
@@ -284,6 +300,7 @@ void * transferSession(void * in){
 	if (inet_aton(fssAddr,&(fss.sin_addr)) < 0){
 		perror("Convert Address Failure");
 		// Failed to convert FSS Address
+		free(s);
 		free(fssAddr);
 		free(parsed);
 		free(init);
@@ -292,7 +309,8 @@ void * transferSession(void * in){
 		return NULL;
 	}
 	 // send the packet
-	int initSize = s->size-patternLen-9+1;
+	int initSize = size-patternLen-9+1;
+	free(s);
 	totalBytes += initSize;
 	while (sendto(sock,init,initSize,0,(struct sockaddr *) &fss,sizeof(fss)) < initSize){
 		// continue resending until we've sent everything, might introduce a weird bug on the FSS end if it sends some of the packet but not all of it
@@ -315,7 +333,12 @@ void * transferSession(void * in){
 	if (inet_aton(ctwoAddr,&(ctwo.sin_addr)) < 0){
 		// Failed to convert C2 address
 		perror("C2 Address Conversion Failure");
+		free(decoded);
 		free(fssAddr);
+		free(parsed->opts);
+		free(parsed->ops);
+		free(parsed->vals);
+		free(parsed->lens);
 		free(parsed);
 		threadClose(socketsIndex,sock);
 		return NULL;
@@ -331,8 +354,15 @@ void * transferSession(void * in){
 		else {
 			if (response[0] == 0x04){
 				sendto(sock,response,1,0,(struct sockaddr *) &ctwo,sizeof(ctwo));
+				free(decoded);
 				free(fssAddr);
+				free(parsed->opts);
+				free(parsed->ops);
+				free(parsed->vals);
+				free(parsed->lens);
 				free(parsed);
+				free(response);
+				free(message);
 				threadClose(socketsIndex,sock);
 				return NULL;
 			}
@@ -348,7 +378,12 @@ void * transferSession(void * in){
 	if (fails == 3){
 		// If the loop ended because it failed
 		printf("Error: Timeout waiting for response\n");
+		free(decoded);
 		free(fssAddr);
+		free(parsed->opts);
+		free(parsed->ops);
+		free(parsed->vals);
+		free(parsed->lens);
 		free(parsed);
 		free(message);
 		free(response);
@@ -366,6 +401,10 @@ void * transferSession(void * in){
 	int ctwoListenSock = makeTCPSocket(tcpPort);
 	if (ctwoListenSock < 0){
 		free(fssAddr);
+		free(parsed->opts);
+		free(parsed->ops);
+		free(parsed->vals);
+		free(parsed->lens);
 		free(parsed);
 		free(validation);
 		close(ctwoListenSock);
@@ -386,6 +425,10 @@ void * transferSession(void * in){
 	if (ctwoSock < 0){
 		perror("Handshake Error: ");
 		free(fssAddr);
+		free(parsed->opts);
+		free(parsed->ops);
+		free(parsed->vals);
+		free(parsed->lens);
 		free(parsed);
 		close(ctwoListenSock);
 		threadClose(socketsIndex,sock);
@@ -404,6 +447,10 @@ void * transferSession(void * in){
 		if (res != 1){
 			perror("Write Error");
 			free(fssAddr);
+			free(parsed->opts);
+			free(parsed->ops);
+			free(parsed->vals);
+			free(parsed->lens);
 			free(parsed);
 			free(data);
 			free(tmpfile);
@@ -426,6 +473,10 @@ void * transferSession(void * in){
 	if (inet_aton(fssAddr,&(fssTCP.sin_addr)) < 0){
 		perror("FSS TCP ADDR");
 		free(fssAddr);
+		free(parsed->opts);
+		free(parsed->ops);
+		free(parsed->vals);
+		free(parsed->lens);
 		free(parsed);
 		free(tmpfile);
 		fclose(temp);
@@ -433,9 +484,12 @@ void * transferSession(void * in){
 		threadClose(socketsIndex,sock);
 		return NULL;
 	}
-	// free fssAddr, dont need it anymore
 	if (connect(ctwoListenSock,(struct sockaddr *) &fssTCP,sizeof(fssTCP)) < 0){
 		perror("Connect");
+		free(parsed->opts);
+		free(parsed->ops);
+		free(parsed->vals);
+		free(parsed->lens);
 		free(parsed);
 		free(tmpfile);
 		fclose(temp);
@@ -450,9 +504,15 @@ void * transferSession(void * in){
 	int sent = 0;
 	while (sent < totalrcvd){
 		int read = fread(raw,sizeof(unsigned char),MAX_SIZE,tmp);
-		int pktSize = send(ctwoListenSock,encode(raw,parsed),read,0);
+		unsigned char * ncoded = encode(raw,parsed);
+		int pktSize = send(ctwoListenSock,ncoded,read,0);
+		free(ncoded);
 		if (pktSize != read){
 			perror("Send Error");
+			free(parsed->opts);
+			free(parsed->ops);
+			free(parsed->vals);
+			free(parsed->lens);
 			free(parsed);
 			free(tmpfile);
 			fclose(tmp);
@@ -466,21 +526,26 @@ void * transferSession(void * in){
 	totalBytes += sent;
 	free(raw);
 	free(tmpfile);
+	free(parsed->opts);
+	free(parsed->ops);
+	free(parsed->vals);
+	free(parsed->lens);
 	free(parsed);
 	fclose(tmp);
 	close(ctwoListenSock);
 	threadClose(socketsIndex,sock);
-	char * entry = calloc(strlen(start_str)+strlen(ctwoAddr)+strlen(fssAddr)+10,sizeof(char));
-	sprintf(entry,"%s:%s->%s:%d:Success\n",start_str,ctwoAddr,fssAddr,totalBytes);
+	char * entry = calloc(256,sizeof(char));
+	snprintf(entry,256,"%s:%s->%s:%d:Success\n",start_str,ctwoAddr,fssAddr,totalBytes);
 	printf("%s",entry);
 	pthread_mutex_lock(&log_lock);
 	FILE * log = fopen(logfile,"a");
 	while (fputs(entry,log) == -1){
 		continue;
 	}
+	free(entry);
 	fclose(log);
-	pthread_mutex_unlock(&log_lock);
 	free(fssAddr);
+	pthread_mutex_unlock(&log_lock);
         return NULL;
 }
 

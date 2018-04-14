@@ -37,16 +37,17 @@ int patternValidate(char * pattern,Pattern * parsed){
 		if (parsed->numOpts > parsed->maxOpts){
 			parsed->maxOpts = parsed->maxOpts * 2;
 			parsed->opts = (char **) realloc(parsed->opts,parsed->maxOpts);
-			if (parsed->opts == NULL){ // | (parsed->ops == NULL) | (parsed->vals == NULL) | (parsed->lens == NULL)){
+			if (parsed->opts == NULL){
 				printf("Error: Realloc Failure\n");
 				return 1;
 			}
 		}
-		parsed->opts[parsed->numOpts] = calloc(strlen(token),sizeof(char));
+//		parsed->opts[parsed->numOpts] = calloc(strlen(token),sizeof(char));
 		parsed->opts[parsed->numOpts] = token;
 		parsed->numOpts += 1;
 		token = strtok(NULL,";");
 	}
+	free(token);
 	if (parsed->numOpts < 2){
 		printf("Error: Invalid Pattern\n");
 		return 1;
@@ -57,7 +58,8 @@ int patternValidate(char * pattern,Pattern * parsed){
 	parsed->vals = (int *) calloc(parsed->numOpts+1,sizeof(int));
 	parsed->lens = (int *) calloc(parsed->numOpts+1,sizeof(int));
 	for (i = 0;i < parsed->numOpts;i++){
-		opVal = strtok(strdup(parsed->opts[i]),":");
+		char * duppedOpts = strdup(parsed->opts[i]);
+		opVal = strtok(duppedOpts,":");
 		char * len = strtok(NULL,":");
 		if (len == NULL){
 			printf("Error: Invalid Length\n");
@@ -133,6 +135,7 @@ int patternValidate(char * pattern,Pattern * parsed){
 			printf("Error: Invalid Operation\n");
 			return 1;
 		}
+		free(duppedOpts);
 	}
 	return 0;
 }
@@ -157,7 +160,8 @@ unsigned char rol(const unsigned char value, int shift){
 // Returns encoded string if successful, NULL otherwise
 unsigned char * encode(unsigned char * data,Pattern * parsed){
 	int currOpt = 0;
-	int size = strlen((char *) data);
+	char * cdata = (char *) data;
+	int size = strlen(cdata);
 	int done = 0;
 	unsigned char * encoded = calloc(size+1,sizeof(unsigned char));
 	while (done < size){
@@ -201,7 +205,8 @@ unsigned char * encode(unsigned char * data,Pattern * parsed){
 // Returns decoded string if successful, NULL otherwise
 unsigned char * decode(unsigned char * data,Pattern * parsed){
 	int currOpt = 0;
-	int size = strlen((char *) data);
+	char * cdata = (char *) data;
+	int size = strlen(cdata);
 	int done = 0;
 	unsigned char * decoded = calloc(size+1,sizeof(unsigned char));
 	while (done < size){
