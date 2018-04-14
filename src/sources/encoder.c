@@ -257,7 +257,7 @@ unsigned char * encode64(unsigned char * string){
 	else {
 		elen = (((int) len/3)+1)*4;
 	}
-	unsigned char * encoded = calloc(elen+1,sizeof(unsigned char));
+	unsigned char * encoded = calloc(elen+2,sizeof(unsigned char));
 	int enc = 0;
 	for (int plain = 0;plain < len;plain+=3){
 		// If we need to pad twice
@@ -287,6 +287,7 @@ unsigned char * encode64(unsigned char * string){
 		enc += 4;
 	}
 	encoded[elen] = '\n';
+	encoded[elen+1] = '\0';
 	return encoded;
 }
 
