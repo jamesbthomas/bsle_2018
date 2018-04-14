@@ -10,6 +10,7 @@
 #include <errno.h>
 #include <arpa/inet.h>
 #include <pthread.h>
+#include <math.h>
 #include <linux/limits.h>
 #include "../headers/encoder.h"
 #include "../headers/udpHandler.h"
@@ -37,7 +38,6 @@ int * sockets;
 pthread_mutex_t log_lock;
 char * logfile;
 pthread_t * tids;
-int currThread;
 fd_set fds;
 
 pthread_mutex_t numthrd_lock;
@@ -47,6 +47,7 @@ pthread_mutex_t ready_lock;
 int ready;
 
 int main(int argc, char ** argv){
+	printf("Starting FTS module...\n");
 	pthread_mutex_lock(&ready_lock);
 	ready = 0;
 	pthread_mutex_unlock(&ready_lock);
@@ -68,9 +69,8 @@ int main(int argc, char ** argv){
 	strftime(time_str,30,"ftsLogs/fts_%d-%m-%y.log",tm_info);
 	memcpy(logfile+strlen(logfile)-3,time_str,strlen(time_str));
 	// Create the file
-	FILE * log = fopen(logfile,"w");
+	FILE * log = fopen(logfile,"a");
 	fclose(log);
-	FILE * readLog = fopen(logfile,"rb");
 	// Create an array to track the thread IDs
 	tids = calloc(TOTAL_SOCKETS,sizeof(pthread_t));
 	pthread_mutex_lock(&numthrd_lock);
@@ -84,21 +84,39 @@ int main(int argc, char ** argv){
 	while (1){
 		fprintf(stdout,"fts> ");
 		if (fgets(cmd,MAX_CMD,stdin) == NULL){
-			printf("%s\n",cmd);
 			continue;
 		}
-		if (strncmp(cmd,"log ",4) == 0){
+		else if (strncmp(cmd,"log ",4) == 0){
 			printf(" -- Prototype for reading the log for specific parameters\n");
 		}
 		else if (strncmp(cmd,"head ",5) == 0){
 			char * line = calloc(256,sizeof(unsigned char));
-			int total = cmd[5]-'0';
+			int total = 0;
+			for (int i = strlen(cmd)-2;i > 4;i--){
+				if (i == strlen(cmd)-2){
+					total += cmd[i]-'0';
+				}
+				else {
+					total += (cmd[i]-'0')*((int) pow(10,(((int) strlen(cmd)-2)-i)));
+				}
+			}
+			FILE * readLog = fopen(logfile,"rb");
 			pthread_mutex_lock(&log_lock);
-			for (int i = 0;i < total;i++){
-				fgets(line,sizeof(line),readLog);
-				printf("%s",line);
+			while (total > 0){
+				fgets(line,256,readLog);
+				if (feof(readLog)){
+					total = 0;
+					printf("<< END OF LOG >>\n");
+					continue;
+				}
+				line[strcspn(line,"\n")] = '\0';
+				unsigned char * dline = decode64((unsigned char *) line);
+				printf("%s\n",dline);
+				free(dline);
+				total -= 1;
 			}
 			pthread_mutex_unlock(&log_lock);
+			fclose(readLog);
 			free(line);
 		}
 		else if (strncmp(cmd,"exit\n",5) == 0){
@@ -117,7 +135,6 @@ int main(int argc, char ** argv){
 			free(path);
 			free(sockets);
 			free(cmd);
-			fclose(readLog);
 			exit(0);
 		}
 		else if (strncmp(cmd,"status",6) == 0){
@@ -132,6 +149,9 @@ int main(int argc, char ** argv){
 				printf("Listener is active\n");
 			}
 			pthread_mutex_unlock(&ready_lock);
+		}
+		else if (strncmp(cmd,"\n",1) == 0){
+			continue;
 		}
 		else {
 			printf("Unrecognized Command - %s",cmd);
@@ -159,7 +179,7 @@ void * listener(void * in){
 	pthread_mutex_lock(&ready_lock);
 	ready = 1;
 	pthread_mutex_unlock(&ready_lock);
-	printf("Ready for connections...\n");
+	printf("Ready!\n");
 	while (ready) {
 		// Zero out the statuses
 		FD_ZERO(&fds);
@@ -205,7 +225,8 @@ void * listener(void * in){
 				free(dgram);
 				// Spin off a thread to handle this
 				pthread_mutex_lock(&numthrd_lock);
-				pthread_create(&tids[numthrds],NULL,transferSession,(void *) newSession);
+				// use x for the thread id, guaranteed to be available because of how sockets[] works and is always made available again once the thread has ended
+				pthread_create(&tids[x],NULL,transferSession,(void *) newSession);
 //				pthread_detach(tids[numthrds]);
 				numthrds += 1;
 				pthread_mutex_unlock(&numthrd_lock);
@@ -230,7 +251,6 @@ void * transferSession(void * in){
 	time_t start = time(0);
 	char * start_str = ctime(&start);
 	start_str[strlen(start_str)-1] = '\0';
-	printf("\nThread Start : %s\n",start_str);
         session * s = (session *) in;
         // Grab some admin info
         int ctwoPort = s->sport;
@@ -371,7 +391,6 @@ void * transferSession(void * in){
 				totalBytes += strlen((char *) response);
 				break;
 			}
-			printf("here %d\n",fssTCPPort);
 			fails += 1;
 		}
 	}
@@ -525,27 +544,29 @@ void * transferSession(void * in){
 	}
 	totalBytes += sent;
 	free(raw);
-	free(tmpfile);
 	free(parsed->opts);
 	free(parsed->ops);
 	free(parsed->vals);
 	free(parsed->lens);
 	free(parsed);
+	free(tmpfile);
 	fclose(tmp);
 	close(ctwoListenSock);
 	threadClose(socketsIndex,sock);
 	char * entry = calloc(256,sizeof(char));
 	snprintf(entry,256,"%s:%s->%s:%d:Success\n",start_str,ctwoAddr,fssAddr,totalBytes);
-	printf("%s",entry);
 	pthread_mutex_lock(&log_lock);
 	FILE * log = fopen(logfile,"a");
-	while (fputs(entry,log) == -1){
-		continue;
-	}
+	char * encEntry = (char *) encode64((unsigned char *) entry);
+	fputs(encEntry,log);
 	free(entry);
+	free(encEntry);
 	fclose(log);
-	free(fssAddr);
 	pthread_mutex_unlock(&log_lock);
+	free(fssAddr);
+	pthread_mutex_lock(&numthrd_lock);
+	numthrds -= 1;
+	pthread_mutex_unlock(&numthrd_lock);
         return NULL;
 }
 

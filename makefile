@@ -11,7 +11,7 @@ WARN=-Werror -Wall
 
 build: objects
 # Builds without debug information and removes object files
-	-gcc -o $(BINDIR)FTS $(MAIN) $(MODS) $(WARN) -lpthread
+	-gcc -o $(BINDIR)FTS $(MAIN) $(MODS) $(WARN) -lpthread -lm
 # Clean 
 	$(RMSRC)
 	$(RMHDR)
@@ -32,7 +32,7 @@ objects:
 	-gcc -c $(SRCDIR)udpHandler.c -o $(SRCDIR)udpHandler.o $(WARN)
 	-gcc -c $(SRCDIR)tcpHandler.c -o $(SRCDIR)tcpHandler.o $(WARN)
 	-gcc -c $(TSTDIR)test.c -o $(TSTDIR)test.o $(WARN)
-	-gcc -c $(SRCDIR)fts.c -o $(SRCDIR)fts.o $(WARN)	
+	-gcc -c $(SRCDIR)fts.c -o $(SRCDIR)fts.o $(WARN)
 
 debug:
 # Builds with debugging symbols
@@ -45,7 +45,7 @@ debug:
 
 buildAll: debug
 # Builds with debug information and leaves object files
-	-gcc -o $(BINDIR)FTS $(MAIN) $(MODS) $(WARN) -lpthread
+	-gcc -o $(BINDIR)FTS $(MAIN) $(MODS) $(WARN) -lpthread -lm
 
 install:
 # Installs applicable external libraries and ensures python3 is available

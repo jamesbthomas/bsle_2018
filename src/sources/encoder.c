@@ -42,7 +42,6 @@ int patternValidate(char * pattern,Pattern * parsed){
 				return 1;
 			}
 		}
-//		parsed->opts[parsed->numOpts] = calloc(strlen(token),sizeof(char));
 		parsed->opts[parsed->numOpts] = token;
 		parsed->numOpts += 1;
 		token = strtok(NULL,";");
@@ -251,7 +250,14 @@ unsigned char * decode(unsigned char * data,Pattern * parsed){
 // Used by each transfer session to create its log entry
 unsigned char * encode64(unsigned char * string){
 	int len = strlen((char *) string);
-	unsigned char * encoded = calloc(len+(4*(len%3)),sizeof(unsigned char));
+	int elen;
+	if (len % 3 == 0){
+		elen = ((int) len/3)*4;
+	}
+	else {
+		elen = (((int) len/3)+1)*4;
+	}
+	unsigned char * encoded = calloc(elen+1,sizeof(unsigned char));
 	int enc = 0;
 	for (int plain = 0;plain < len;plain+=3){
 		// If we need to pad twice
@@ -280,6 +286,7 @@ unsigned char * encode64(unsigned char * string){
 		}
 		enc += 4;
 	}
+	encoded[elen] = '\n';
 	return encoded;
 }
 
