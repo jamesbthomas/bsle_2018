@@ -12,6 +12,7 @@ sys.path.append(bin_dir)
 try:
 	from C2 import socketValidate
 	from udpHandler import *
+	from tcpHandler import *
 	from encoder import *
 	from fileHandler import *
 except ImportError as err:
@@ -34,95 +35,7 @@ class DefaultTestCase(unittest.TestCase):
 		self.stdout.close()
 		sys.stdout = sys.__stdout__
 
-class PatternValidateTestCase(DefaultTestCase):
-
-	def runTest(self):
-		print("Running patternValidate tests")
-		# Valid Patterns
-		## Provided in the prompt
-		self.assertTrue(patternValidate("^2:40;rol1:120"))
-		self.assertTrue(patternValidate("~:20;ror3:40"))
-		self.assertTrue(patternValidate("ror8:80;^16:160"))
-		## Should match patterns with more than two options
-		self.assertTrue(patternValidate("^2:40;rol1:120;~:20"))
-		self.assertTrue(patternValidate("ror3:40;ror8:80;^16:160"))
-		# Invalid Patterns
-		## Should fail on single, valid options
-		self.assertFalse(patternValidate("^2:40"))
-		self.assertFalse(patternValidate("rol1:120"))
-		self.assertFalse(patternValidate("rol10:300"))
-		## Should fail if first char in the option is not ^,~, or r
-		self.assertFalse(patternValidate("a4:120;ror8:30"))
-		self.assertFalse(patternValidate("rol6:5;14:340"))
-		self.assertFalse(patternValidate("$7:5;rol6:30;~:94"))
-		## Should fail if first char is r and is not followed by 'or' or 'ol'
-		self.assertFalse(patternValidate("r1:5"))
-		self.assertFalse(patternValidate("ro5:60"))
-		self.assertFalse(patternValidate("rox5:100"))
-		## Should fail if ~ not followed by a :
-		self.assertFalse(patternValidate("~3:40"))
-		self.assertFalse(patternValidate("rol9:3;~a:29"))
-		self.assertFalse(patternValidate("~%:3;rol8:20"))
-		## Should fail if has a valid operation but no number
-		self.assertFalse(patternValidate("~:20"))
-		self.assertFalse(patternValidate("^:30"))
-		self.assertFalse(patternValidate("rol:80"))
-		self.assertFalse(patternValidate("ror:40"))
-		## Should fail if valid operation not followed by number of bytes
-		self.assertFalse(patternValidate("^2:40;rol1"))
-		self.assertFalse(patternValidate("~:20;ror3:a"))
-		self.assertFalse(patternValidate("ror8:%;rol6:40"))
-		self.assertFalse(patternValidate("rol8:~"))
-		self.assertFalse(patternValidate("^5:80;rol36:^39"))
-
-class FileValidateTestCase(DefaultTestCase):
-
-	def runTest(self):
-		# Known valid files
-		## Relative Path
-		self.assertEqual(self.handler.fileValidate(bin_dir+"/C2.py"),True)
-		self.assertEqual(self.handler.fileValidate(headers_dir+"/../sources/README.md"),True)
-		## Absolute Path (Assumes *nix system)
-		self.assertEqual(self.handler.fileValidate("/usr/lib/os-release"),True)
-		self.assertEqual(self.handler.fileValidate("/etc/passwd"),True)
-		# Known invalid files
-		## Relative Path
-		self.assertEqual(self.handler.fileValidate("../../badfile"),False)
-		self.assertEqual(self.handler.fileValidate("../anotherbad"),False)
-		self.assertEqual(self.handler.fileValidate("badhere"),False)
-		## Absoluate Path
-		self.assertEqual(self.handler.fileValidate("/etc/badfile"),False)
-		self.assertEqual(self.handler.fileValidate("/home/baddir"),False)
-		# Malformed Path
-		self.assertEqual(self.handler.fileValidate(".../."),False)
-		self.assertEqual(self.handler.fileValidate("$/.."),False)
-
-class socketValidateTestCase(DefaultTestCase):
-
-	def runTest(self):
-		# Valid Socket
-		self.assertTrue(socketValidate("127.0.0.1:1"))
-		self.assertTrue(socketValidate("8.8.8.8:4000"))
-		self.assertTrue(socketValidate("10.73.195.4:65535"))
-		# Invalid IP
-		self.assertFalse(socketValidate("256.256.256.256:1"))
-		self.assertFalse(socketValidate("a.b.c.d:1"))
-		self.assertFalse(socketValidate("0.0.0.-1:1"))
-		self.assertFalse(socketValidate("0.0.0.0:1"))
-		self.assertFalse(socketValidate("255.255.255.255:1"))
-		# Invalid Port
-		self.assertFalse(socketValidate("127.0.0.1:0"))
-		self.assertFalse(socketValidate("127.0.0.1:65536"))
-		# Invalid Format
-		self.assertFalse(socketValidate("127001:1"))
-		self.assertFalse(socketValidate("127.0.0.14000"))
-
-class ConvertAddrTestCase(DefaultTestCase):
-
-	def runTest(self):
-		self.assertEqual(self.udp.convertAddr("127.0.0.1"),2130706433)
-		self.assertEqual(self.udp.convertAddr("0.0.0.0"),0)
-		self.assertEqual(self.udp.convertAddr("255.255.255.255"),4294967295)
+##	ENCODER TESTS	##
 
 class EncoderTestCase(DefaultTestCase):
 
@@ -179,6 +92,86 @@ class DecodeTestCase(DefaultTestCase):
 		self.assertEqual(encs[1].decode(second),"second message")
 		# TODO check exception cases
 
+class PatternValidateTestCase(DefaultTestCase):
+
+	def runTest(self):
+		# Valid Patterns
+		## Provided in the prompt
+		self.assertTrue(patternValidate("^2:40;rol1:120"))
+		self.assertTrue(patternValidate("~:20;ror3:40"))
+		self.assertTrue(patternValidate("ror8:80;^16:160"))
+		## Should match patterns with more than two options
+		self.assertTrue(patternValidate("^2:40;rol1:120;~:20"))
+		self.assertTrue(patternValidate("ror3:40;ror8:80;^16:160"))
+		# Invalid Patterns
+		## Should fail on single, valid options
+		self.assertFalse(patternValidate("^2:40"))
+		self.assertFalse(patternValidate("rol1:120"))
+		self.assertFalse(patternValidate("rol10:300"))
+		## Should fail if first char in the option is not ^,~, or r
+		self.assertFalse(patternValidate("a4:120;ror8:30"))
+		self.assertFalse(patternValidate("rol6:5;14:340"))
+		self.assertFalse(patternValidate("$7:5;rol6:30;~:94"))
+		## Should fail if first char is r and is not followed by 'or' or 'ol'
+		self.assertFalse(patternValidate("r1:5"))
+		self.assertFalse(patternValidate("ro5:60"))
+		self.assertFalse(patternValidate("rox5:100"))
+		## Should fail if ~ not followed by a :
+		self.assertFalse(patternValidate("~3:40"))
+		self.assertFalse(patternValidate("rol9:3;~a:29"))
+		self.assertFalse(patternValidate("~%:3;rol8:20"))
+		## Should fail if has a valid operation but no number
+		self.assertFalse(patternValidate("~:20"))
+		self.assertFalse(patternValidate("^:30"))
+		self.assertFalse(patternValidate("rol:80"))
+		self.assertFalse(patternValidate("ror:40"))
+		## Should fail if valid operation not followed by number of bytes
+		self.assertFalse(patternValidate("^2:40;rol1"))
+		self.assertFalse(patternValidate("~:20;ror3:a"))
+		self.assertFalse(patternValidate("ror8:%;rol6:40"))
+		self.assertFalse(patternValidate("rol8:~"))
+		self.assertFalse(patternValidate("^5:80;rol36:^39"))
+
+## 	FILEHANDLER TESTS	##
+
+class FileValidateTestCase(DefaultTestCase):
+
+	def runTest(self):
+		# Known valid files
+		## Relative Path
+		self.assertEqual(self.handler.fileValidate(bin_dir+"/C2.py"),True)
+		self.assertEqual(self.handler.fileValidate(headers_dir+"/../sources/README.md"),True)
+		## Absolute Path (Assumes *nix system)
+		self.assertEqual(self.handler.fileValidate("/usr/lib/os-release"),True)
+		self.assertEqual(self.handler.fileValidate("/etc/passwd"),True)
+		# Known invalid files
+		## Relative Path
+		self.assertEqual(self.handler.fileValidate("../../badfile"),False)
+		self.assertEqual(self.handler.fileValidate("../anotherbad"),False)
+		self.assertEqual(self.handler.fileValidate("badhere"),False)
+		## Absoluate Path
+		self.assertEqual(self.handler.fileValidate("/etc/badfile"),False)
+		self.assertEqual(self.handler.fileValidate("/home/baddir"),False)
+		# Malformed Path
+		self.assertEqual(self.handler.fileValidate(".../."),False)
+		self.assertEqual(self.handler.fileValidate("$/.."),False)
+
+class ContainsTestCase(DefaultTestCase):
+
+	def runTest(self):
+		self.assertEqual(self.handler.contains("/etc/hosts","127.0.0.1"),"127.0.0.1	localhost\n")
+		self.assertEqual(self.handler.contains("/etc/hosts","::1"),"::1     ip6-localhost ip6-loopback\n")
+		self.assertEqual(self.handler.contains(headers_dir+"/udpHandler.py","this is not there"),None)
+		self.assertEqual(self.handler.contains(headers_dir+"/udpHandler.py","# Python3 Source File"),"# Python3 Source File for the UDPHandler class used to craft packets for the custom communication protocol and supporting functions\n")
+		self.assertEqual(self.handler.contains("/etc/hosts",1),"127.0.0.1	localhost\n")
+
+class AddTestCase(DefaultTestCase):
+
+	def runTest(self):
+		self.assertEqual(1,0);
+
+##	UDPHANDLER TESTS	##
+
 class CraftRequestTestCase(DefaultTestCase):
 
 	def runTest(self):
@@ -195,20 +188,6 @@ class CraftRequestTestCase(DefaultTestCase):
 		self.assertEqual(fifthTest,None)
 		sixthTest = self.udp.craftRequest("127.0.0.1","1111","~:40;rol1120","sixthTest","passwd")
 		self.assertEqual(sixthTest,None)
-
-class CraftResponseTestCase(DefaultTestCase):
-
-	def runTest(self):
-		# good input
-		first = self.udp.craftResponse(1337,"pass")
-		firstpkt = b'\x02\x05\x39pass'
-		self.assertEqual(first,firstpkt)
-		# low port
-		second = self.udp.craftResponse(0,"low port")
-		self.assertEqual(second,None)
-		# high port
-		third = self.udp.craftResponse(65536,"high port")
-		self.assertEqual(third,None)
 
 class UnpackInitTestCase(DefaultTestCase):
 
@@ -229,14 +208,70 @@ class UnpackInitTestCase(DefaultTestCase):
 		self.assertEqual(mess,None)
 		self.assertEqual(name,None)
 
-class ContainsTestCase(DefaultTestCase):
+class ConvertAddrTestCase(DefaultTestCase):
 
 	def runTest(self):
-		self.assertEqual(self.handler.contains("/etc/hosts","127.0.0.1"),"127.0.0.1	localhost\n")
-		self.assertEqual(self.handler.contains("/etc/hosts","::1"),"::1     ip6-localhost ip6-loopback\n")
-		self.assertEqual(self.handler.contains(headers_dir+"/udpHandler.py","this is not there"),None)
-		self.assertEqual(self.handler.contains(headers_dir+"/udpHandler.py","# Python3 Source File"),"# Python3 Source File for the UDPHandler class used to craft packets for the custom communication protocol and supporting functions\n")
-		self.assertEqual(self.handler.contains("/etc/hosts",1),"127.0.0.1	localhost\n")
+		self.assertEqual(self.udp.convertAddr("127.0.0.1"),2130706433)
+		self.assertEqual(self.udp.convertAddr("0.0.0.0"),0)
+		self.assertEqual(self.udp.convertAddr("255.255.255.255"),4294967295)
+
+class CraftResponseTestCase(DefaultTestCase):
+
+	def runTest(self):
+		# good input
+		first = self.udp.craftResponse(1337,"pass")
+		firstpkt = b'\x02\x05\x39pass'
+		self.assertEqual(first,firstpkt)
+		# low port
+		second = self.udp.craftResponse(0,"low port")
+		self.assertEqual(second,None)
+		# high port
+		third = self.udp.craftResponse(65536,"high port")
+		self.assertEqual(third,None)
+
+class UnpackValidationTestCase(DefaultTestCase):
+
+	def runTest(self):
+		self.assertEqual(1,0)
+
+class MakeUDPTestCase(DefaultTestCase):
+
+	def runTest(self):
+		self.assertEqual(1,0)
+
+## 	TCPHANDLER TESTS	##
+
+class TCPInitTestCase(DefaultTestCase):
+
+	def runTest(self):
+		self.assertEqual(1,0)
+
+class AddrValidateTestCase(DefaultTestCase):
+
+	def runTest(self):
+		self.assertEqual(1,0)
+
+## 	C2 GENERIC TESTS	##
+
+class socketValidateTestCase(DefaultTestCase):
+
+	def runTest(self):
+		# Valid Socket
+		self.assertTrue(socketValidate("127.0.0.1:1"))
+		self.assertTrue(socketValidate("8.8.8.8:4000"))
+		self.assertTrue(socketValidate("10.73.195.4:65535"))
+		# Invalid IP
+		self.assertFalse(socketValidate("256.256.256.256:1"))
+		self.assertFalse(socketValidate("a.b.c.d:1"))
+		self.assertFalse(socketValidate("0.0.0.-1:1"))
+		self.assertFalse(socketValidate("0.0.0.0:1"))
+		self.assertFalse(socketValidate("255.255.255.255:1"))
+		# Invalid Port
+		self.assertFalse(socketValidate("127.0.0.1:0"))
+		self.assertFalse(socketValidate("127.0.0.1:65536"))
+		# Invalid Format
+		self.assertFalse(socketValidate("127001:1"))
+		self.assertFalse(socketValidate("127.0.0.14000"))
 
 if __name__ == "__main__":
 	unittest.main()

@@ -1,6 +1,5 @@
 # Python3 Source File for File Storage Service Main Function
 ## Each FSS instance supports exactly one encoding pattern specified by the user at runtime
-# TODO TEST!!!!
 import getopt, sys, socket, os
 file_loc = os.path.dirname(os.path.realpath(__file__))
 headers_dir = "/".join(file_loc.split("/")[:-1])+"/src/headers"
@@ -30,6 +29,8 @@ def main(opts):
 				pattern = val
 		elif switch == "-d" or switch == "--destination":
 			destination = val
+			if destination[-1:] != '/':
+				destination += '/'
 		elif switch == "-p" or switch == "--port":
 			if int(val) > 65535 or int(val) < 1:
 				print("Error: Invalid Port Number")
@@ -41,6 +42,9 @@ def main(opts):
 			print("Error: Invalid Switch")
 			usage()
 			sys.exit(1)
+
+	if destination == None:
+		destination = "./"
 
 	if pattern == None or port == None:
 		print("Error: Failed to assign values")
@@ -73,7 +77,7 @@ def main(opts):
 					sys.exit(0)
 
 				# Verify that the filename is available for this transfer
-				if handler.fileValidate(filename):
+				if handler.fileValidate(destination+filename):
 					# Send packet type 0x04
 					if verbose:
 						print("File name exists - sending type 0x04")
@@ -98,6 +102,7 @@ def main(opts):
 			# Prep the TCP Listener
 			tcpSock = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
 			tcpSock.bind(('0.0.0.0',0))
+			tcpSock.settimeout(5)
 			tcpPort = tcpSock.getsockname()[1]
 			tcpSock.listen(1)
 
@@ -111,20 +116,26 @@ def main(opts):
 
 			tcp = TCPHandler(ftsAddr,-1,pattern,verbose)
 			s,src = tcpSock.accept()
-			s.settimeout(0.5)
+			s.settimeout(1)
 
 			if (src[0] != ftsAddr):
 				print("WRONG SOURCE")
+				tcpSock.close()
+				s.close()
 				sys.exit(0)
 
 			# Receive the file
-			rcvd = tcp.recvFile(s,filename)
+			rcvd = tcp.recvFile(s,destination+filename)
 			if rcvd < 1:
 				print("Receive Failure")
+				tcpSock.close()
+				s.close()
 				sys.exit(2)
 
 			if verbose:
 				print("File Received - Wrote "+str(rcvd)+" bytes")
+			tcpSock.close()
+			s.close()
 
 	except KeyboardInterrupt:
 		print("\nBye!")
@@ -143,7 +154,7 @@ def help():
 	print("\nSwitches - ")
 	print("\t -e <pattern> \t same as --encode, specifies the encoding pattern that this FSS will support")
 	print("\t -p <port> \t same as --port, specifies the port to listen on")
-	print("\t -d <path> \t optional, same as --destination, specify the destination directory for the FSS to store files")
+	print("\t -d <path> \t optional, same as --destination, specify the destination directory for the FSS to store files, defaults to the working directory at runtime")
 	print("\t -v\t\t same as --verbose, display verbose output")
 	print("\t -h\t\t same as --help, display this menu")
 	return 0

@@ -9,11 +9,11 @@ class Encoder:
 		# Confirm pattern format
 		self.ops = []
 		self.lens = []
-		opts = pattern.split(";")
-		if (len(opts) != 2):
+		self.opts = pattern.split(";")
+		if (len(self.opts) != 2):
 			print("Error: Invalid Pattern Format")
 			raise ValueError("Invalid Pattern Format")
-		for opt in opts:
+		for opt in self.opts:
 			opLen = opt.split(":")
 			if (len(opLen) != 2):
 				print("Error: Invalid Option Format")

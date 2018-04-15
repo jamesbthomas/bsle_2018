@@ -104,6 +104,8 @@ class UDPHandler:
 ## Return Value - the socket object on success, None otherwise
 def makeUDP(port,timeout):
 	try:
+		if (port > 65535 or port < 1):
+			return None
 		sock = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
 		sock.bind(('0.0.0.0',port))
 		if timeout:
