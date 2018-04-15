@@ -86,7 +86,13 @@ class UDPHandler:
 	def unpackValidation(self,pkt,message):
 		# Unpack Packet Type 0x03
 		# Takes the packet and initialization message and returns the TCP Port for the transfer or None if the validation message does not match
-		# TODO find a way to convert unsent packet into raw bytes so we can unit test this
+		try:
+			if len(pkt) == 0:
+				print("Error: Empty Packet")
+				return None
+		except TypeError:
+			print("Error: NoneType Packet")
+			return None
 		if int(pkt[0]) != 0x03:
 			print("Error: Invalid Packet Type")
 			return None
@@ -112,7 +118,7 @@ def makeUDP(port,timeout):
 			sock.settimeout(0.2)
 		return sock
 	except socket.error as err:
-		print("Error: Failed to create UDP socket - "+err)
+		print("Error: Failed to create UDP socket -",err)
 		return None
 
 # Function to send the request packet to the FTS and receive the validation packet

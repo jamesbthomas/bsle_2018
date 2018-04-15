@@ -30,4 +30,5 @@ class FileHandler:
 	def add(self,path,string):
 		f = open(path,"w+")
 		f.write(string+"\n")
+		f.close()
 		return len(string+"\n")

@@ -1,4 +1,4 @@
-# Unit tests for C2 program using the unittest module
+# Unit tests for C2 and FSS programs using the unittest module
 import sys, unittest, os
 from struct import *
 file_loc = os.path.dirname(os.path.realpath(__file__))
@@ -64,7 +64,6 @@ class EncodeTestCase(DefaultTestCase):
 		# Both run twice or more
 		self.assertEqual(encs[0].encode("messages"),b'\x92\x9a\x72\x72\x9e\x98\x64\x72')
 		self.assertEqual(encs[1].encode("messages"),b'\xb6\xb2\xe6\xe6\xb0\xb3\xca\xe6')
-		# TODO check exception cases
 
 class DecodeTestCase(DefaultTestCase):
 
@@ -90,7 +89,6 @@ class DecodeTestCase(DefaultTestCase):
 		second = encs[1].encode("second message")
 		self.assertEqual(encs[0].decode(first),"first message")
 		self.assertEqual(encs[1].decode(second),"second message")
-		# TODO check exception cases
 
 class PatternValidateTestCase(DefaultTestCase):
 
@@ -168,7 +166,11 @@ class ContainsTestCase(DefaultTestCase):
 class AddTestCase(DefaultTestCase):
 
 	def runTest(self):
-		self.assertEqual(1,0);
+		self.assertEqual(self.handler.add("testfile.txt","test string"),len("test string")+1)
+		f = open("testfile.txt","r")
+		self.assertEqual(f.read(len("test string")),"test string")
+		f.close()
+		os.remove("testfile.txt")
 
 ##	UDPHANDLER TESTS	##
 
@@ -232,24 +234,63 @@ class CraftResponseTestCase(DefaultTestCase):
 class UnpackValidationTestCase(DefaultTestCase):
 
 	def runTest(self):
-		self.assertEqual(1,0)
+		# good packet
+		self.assertEqual(self.udp.unpackValidation(b'\x03\x05\x39\x67\x6f\x6f\x64\x20\x70\x61\x63\x6b\x65\x74',"good packet"),1337)
+		# bad packet type
+		self.assertEqual(self.udp.unpackValidation(b'\x00\x05\x39\x67\x6f\x6f\x64\x20\x70\x61\x63\x6b\x65\x74',"bad type"),None)
+		# bad port
+		self.assertEqual(self.udp.unpackValidation(b'\x03\x00\x00\x67\x6f\x6f\x64\x20\x70\x61\x63\x6b\x65\x74',"bad port"),None)
+		# bad message
+		self.assertEqual(self.udp.unpackValidation(b'\x03\x05\x39\x68\x6f\x6f\x64\x20\x70\x61\x63\x6b\x65\x74',"good packet"),None)
+		# empty packet
+		self.assertEqual(self.udp.unpackValidation(b'',"empty packet"),None)
+		self.assertEqual(self.udp.unpackValidation(None,"empty packet"),None)
 
 class MakeUDPTestCase(DefaultTestCase):
 
 	def runTest(self):
-		self.assertEqual(1,0)
+		sock = makeUDP(1337,True)
+		self.assertNotEqual(sock,None)
+		sock.close()
+		sock = makeUDP(1338,False)
+		self.assertNotEqual(sock,None)
+		sock.close()
+		self.assertEqual(makeUDP(0,False),None)
+		self.assertEqual(makeUDP(65536,False),None)
 
 ## 	TCPHANDLER TESTS	##
 
 class TCPInitTestCase(DefaultTestCase):
 
 	def runTest(self):
-		self.assertEqual(1,0)
+		# good handler
+		t = TCPHandler("127.0.0.1",1337,"~:2;~:2",True)
+		self.assertEqual(t.dst,"127.0.0.1")
+		self.assertEqual(t.dport,1337)
+		self.assertEqual(t.enc.ops,["~","~"])
+		self.assertEqual(t.enc.lens,["2","2"])
+		self.assertEqual(t.enc.opts,["~:2","~:2"])
+		self.assertEqual(t.enc.pattern,"~:2;~:2")
+		self.assertEqual(t.verbose,True)
+		# bad address
+		self.assertRaises(ValueError,TCPHandler,"bad address",1337,"~:2;~:2",True)
+		# bad port
+		self.assertRaises(ValueError,TCPHandler,"127.0.0.1",0,"~:2;~:2",True)
+		self.assertRaises(ValueError,TCPHandler,"127.0.0.1",65536,"~:2;~:2",True)
+		# bad pattern
+		self.assertRaises(ValueError,TCPHandler,"127.0.0.1",1337,"bad pattern",True)
 
 class AddrValidateTestCase(DefaultTestCase):
 
 	def runTest(self):
-		self.assertEqual(1,0)
+		# good address
+		self.assertTrue(addrValidate("127.0.0.1"))
+		# broadcast address
+		self.assertFalse(addrValidate("0.0.0.0"))
+		self.assertFalse(addrValidate("255.255.255.255"))
+		# except cases
+		self.assertFalse(addrValidate("bad address"))
+		self.assertFalse(addrValidate(""))
 
 ## 	C2 GENERIC TESTS	##
 

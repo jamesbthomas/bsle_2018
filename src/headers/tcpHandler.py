@@ -10,14 +10,21 @@ class TCPHandler():
 		# Takes a destination address and port for all sent traffic
 		# Also takes a verbose argument to mark the session as verbose
 		self.verbose = verbose
+		if not addrValidate(dst):
+			raise ValueError('Invalid IP Address')
 		self.dst = dst
+		if dport < 1 or dport > 65535:
+			raise ValueError('Invalid port number')
 		self.dport = dport
 		self.sport = None
 		self.seq = random.randint(0,2147483647)
 		self.lastSeq = 0
 		self.nextSeq = 0
 		self.socket = None
-		self.enc = Encoder(pattern)
+		try:
+			self.enc = Encoder(pattern)
+		except ValueError as err:
+			raise ValueError(err)
 
 	def handshake(self):
 		# Conducts the TCP three-way handshake with the destination and port provided at init

@@ -62,7 +62,7 @@ class Encoder:
 							xorVal = int(self.ops[i][1:])%8
 							self.enc += bytes([byte ^ xorVal])
 						else:
-							print("Error: Internal Error - Unknown Operator") # TODO raise exception
+							print("Error: Internal Error - Unknown Operator")
 							return None
 						index += 1
 						numOps += 1
@@ -89,7 +89,7 @@ class Encoder:
 							if (len(byte) < 8):
 								byte = '0'+byte
 							elif (len(byte) > 8):
-								print("Error: Internal Error - Binary Translation Error") # TODO raise exception
+								print("Error: Internal Error - Binary Translation Error")
 								return None
 							rollVal = int(self.ops[i][1:])%8
 							self.plainBytes += bytes([int("".join(byte[rollVal:]+byte[:rollVal]),2)])
@@ -99,7 +99,7 @@ class Encoder:
 							if (len(byte) < 8):
 								byte = '0'+byte
 							elif (len(byte) > 8):
-								print("Error: Internal Error - Binary Translation Error") # TODO raise exception
+								print("Error: Internal Error - Binary Translation Error")
 								return None
 							rollVal = (int(self.ops[i][1:])%8) * -1
 							self.plainBytes += bytes([int("".join(byte[rollVal:]+byte[:rollVal]),2)])
@@ -109,7 +109,7 @@ class Encoder:
 							xorVal = int(self.ops[i][1:])%8
 							self.plainBytes += bytes([byte ^ xorVal])
 						else:
-							print("Error: Internal Error - Unknown Operator") # TODO raise exception
+							print("Error: Internal Error - Unknown Operator")
 							return None
 						index += 1
 						numOps += 1
