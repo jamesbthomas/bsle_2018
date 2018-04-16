@@ -32,122 +32,135 @@ int patternValidate(char * pattern,Pattern * parsed){
 	parsed -> numOpts = 0;
 	parsed -> maxOpts = 2;
 	parsed -> opts = calloc(parsed->maxOpts,sizeof(char *));
+	// Build out the options
 	char * token = strtok(pattern,";");
 	while (token != NULL){
+		// Check to see if we need to allocate more space for the options
 		if (parsed->numOpts >= parsed->maxOpts){
 			parsed->maxOpts = parsed->maxOpts * 2;
 			parsed->opts = (char **) realloc(parsed->opts,parsed->maxOpts*sizeof(char *));
 			if (parsed->opts == NULL){
-				printf("Error: Realloc Failure\n");
+				// realloc failure
 				return 1;
 			}
 		}
+		// Assign the option and increase the number of options
 		parsed->opts[parsed->numOpts] = token;
 		parsed->numOpts += 1;
 		token = strtok(NULL,";");
 	}
 	free(token);
+	// Make sure there are at least two options in the pattern
 	if (parsed->numOpts < 2){
-		printf("Error: Invalid Pattern\n");
 		return 1;
 	}
+	// Allocate space for the rest of the struct and some stuff to process the opts
 	int i;
 	char * opVal;
 	parsed->ops = (char *) calloc(parsed->numOpts,sizeof(char *));
 	parsed->vals = (int *) calloc(parsed->numOpts+1,sizeof(int));
 	parsed->lens = (int *) calloc(parsed->numOpts+1,sizeof(int));
 	for (i = 0;i < parsed->numOpts;i++){
+		// Create a duplicate of the option that we can tokenize
 		char * duppedOpts = strdup(parsed->opts[i]);
 		opVal = strtok(duppedOpts,":");
 		char * len = strtok(NULL,":");
+		// Check the format of the option
 		if (len == NULL){
-			printf("Error: Invalid Length\n");
 			free(duppedOpts);
 			return 1;
 		}
+		// Validate the length from the pattern and capture it
 		int num = atoi(len);
 		if (num == 0 && strncmp(len,"0",1) != 0){
-			printf("Error: Invalid Length\n");
 			free(duppedOpts);
 			return 1;
 		}
 		parsed->lens[i] = num;
+		// Another format check
 		if (strtok(NULL,":") != NULL){
-			printf("Error: Invalid Option\n");
 			free(duppedOpts);
 			return 1;
 		}
+		// handle the ^ operator
 		if (strncmp(opVal,"^",1) == 0){
 			parsed->ops[i] = opVal[0];
+			// format check
 			if (strlen(opVal) < 2){
-				printf("Error: Invalid Operation\n");
 				free(duppedOpts);
 				return 1;
 			}
+			// Convert the value of this option to something useable
 			char * val = calloc(strlen(opVal),sizeof(char));
 			for (int c = 1;c < strlen(opVal);c++){
 				if (isdigit(opVal[c]) == 0){
-					printf("Error: Invalid Value\n");
 					free(duppedOpts);
 					return 1;
 				}
 				val[c-1] = opVal[c];
 			}
+			// Capture the value
 			val[strlen(opVal)-1] = '\0';
 			parsed->vals[i] = atoi(val)%8;
 			free(val);
 		}
+		// handle the ror operator
 		else if (strncmp(opVal,"ror",3) == 0){
 			parsed->ops[i] = opVal[2];
+			// format check
 			if (strlen(opVal) < 4){
-				printf("Error: Invalid Operation\n");
 				free(duppedOpts);
 				return 1;
 			}
+			// convert the value to something useable
 			char * val = calloc(strlen(opVal)-2,sizeof(char));
 			for (int c = 3;c < strlen(opVal);c++){
 				if (isdigit(opVal[c]) == 0){
-					printf("Error: Invalid Value\n");
 					free(duppedOpts);
 					return 1;
 				}
 				val[c-3] = opVal[c];
 			}
+			// capture the value
 			val[strlen(opVal)-3] = '\0';
 			parsed->vals[i] = atoi(val)%8;
 			free(val);
 		}
+		// handle the rol operator
 		else if (strncmp(opVal,"rol",3) == 0){
 			parsed->ops[i] = opVal[2];
+			// format check
 			if (strlen(opVal) < 4){
-				printf("Error: Invalid Operation\n");
 				free(duppedOpts);
 				return 1;
 			}
+			// convert the value to something useable
 			char * val = calloc(strlen(opVal)-2,sizeof(char));
 			for (int c = 3;c < strlen(opVal);c++){
 				if (isdigit(opVal[c]) == 0){
-					printf("Error: Invalid Value\n");
 					free(duppedOpts);
 					return 1;
 				}
 				val[c-3] = opVal[c];
 			}
+			// capture the value
 			val[strlen(opVal)-3] = '\0';
 			parsed->vals[i] = atoi(val)%8;
 			free(val);
 		}
+		// handle the ~ operator
 		else if (strncmp(opVal,"~",1) == 0){
+			// format check
 			if (strlen(opVal) != 1){
-				printf("Error: Invalid Operation\n");
 				free(duppedOpts);
 				return 1;
 			}
+			// capture the value
 			parsed->ops[i] = opVal[0];
 			parsed->vals[i] = 0;
 		}
+		// handle invalid operators
 		else{
-			printf("Error: Invalid Operation\n");
 			free(duppedOpts);
 			return 1;
 		}
@@ -175,45 +188,52 @@ unsigned char rol(const unsigned char value, int shift){
 // Function to encode a string using a provided parsed encoding pattern
 // Returns encoded string if successful, NULL otherwise
 unsigned char * encode(unsigned char * data,Pattern * parsed){
+	// allocate space for stuff that this function needs
 	int currOpt = 0;
 	char * cdata = (char *) data;
 	int size = strlen(cdata);
 	int done = 0;
 	unsigned char * encoded = calloc(size+1,sizeof(unsigned char));
+	// while the number of characters weve encoded is less than the total number of characters we need to encode
 	while (done < size){
-		char opt = parsed->ops[currOpt];
+		// grab the operator value and length of the current encoding option
+		char op = parsed->ops[currOpt];
 		int val = parsed->vals[currOpt];
 		int len = parsed->lens[currOpt];
+		// encode as many characters as this encoding option is supposed to handle
 		for (int count = 0;count < len;count++){
 			if (done > size){
 				return encoded;
 			}
-			if (opt == '^'){
+			if (op == '^'){
 				encoded[done] = val ^ data[done];
 			}
-			else if (opt == 'r'){
+			else if (op == 'r'){
 				unsigned char shifted = ror(data[done],val);
 				encoded[done] = shifted;
 			}
-			else if (opt == 'l'){
+			else if (op == 'l'){
 				unsigned char shifted = rol(data[done],val);
 				encoded[done] = shifted;
 			}
-			else if (opt == '~'){
+			else if (op == '~'){
 				encoded[done] = ~data[done];
 			}
 			else{
-				printf("Error: Invalid Parsed Pattern\n");
+				// invalid operator
 				free(encoded);
 				return NULL;
 			}
 			done += 1;
 		}
+		// increment currOpt to move to the next encoding option
 		currOpt += 1;
+		// enable encoding to wrap back around to the beginning of the pattern if there is still more to encode
 		if (currOpt > parsed->numOpts){
 			currOpt = 0;
 		}
 	}
+	// null terminate the encoded string
 	encoded[size] = '\0';
 	return encoded;
 }
@@ -221,15 +241,19 @@ unsigned char * encode(unsigned char * data,Pattern * parsed){
 // Function to decode a string using a provided parsed encoding pattern
 // Returns decoded string if successful, NULL otherwise
 unsigned char * decode(unsigned char * data,Pattern * parsed){
+	// initial allocation
 	int currOpt = 0;
 	char * cdata = (char *) data;
 	int size = strlen(cdata);
 	int done = 0;
 	unsigned char * decoded = calloc(size+1,sizeof(unsigned char));
+	// while the number of decoded characters is less than the total number of characters
 	while (done < size){
+		// grab the operator value and length of the current encoding option
 		char opt = parsed->ops[currOpt];
 		int val = parsed->vals[currOpt];
 		int len = parsed->lens[currOpt];
+		// use the operator and value as many times as len specified
 		for (int count = 0;count < len;count++){
 			if (done > size){
 				return decoded;
@@ -254,11 +278,14 @@ unsigned char * decode(unsigned char * data,Pattern * parsed){
 			}
 			done += 1;
 		}
+		// move to the next encoding option
 		currOpt += 1;
+		// enable the function to wrap back to the beginning of the encoding pattern
 		if (currOpt > parsed->numOpts){
 			currOpt = 0;
 		}
 	}
+	// null terminate the decoded string and return
 	decoded[size] = '\0';
 	return decoded;
 }
@@ -267,6 +294,7 @@ unsigned char * decode(unsigned char * data,Pattern * parsed){
 // Returns encoded string if successful, NULL otherwise
 // Used by each transfer session to create its log entry
 unsigned char * encode64(unsigned char * string){
+	// find the length of the base64 encoded string based on the length of the input string
 	int len = strlen((char *) string);
 	int elen;
 	if (len % 3 == 0){
@@ -275,7 +303,9 @@ unsigned char * encode64(unsigned char * string){
 	else {
 		elen = (((int) len/3)+1)*4;
 	}
+	// allocate space for it
 	unsigned char * encoded = calloc(elen+2,sizeof(unsigned char));
+	// encode
 	int enc = 0;
 	for (int plain = 0;plain < len;plain+=3){
 		// If we need to pad twice
@@ -304,6 +334,7 @@ unsigned char * encode64(unsigned char * string){
 		}
 		enc += 4;
 	}
+	// add a newline, null terminate, and return
 	encoded[elen] = '\n';
 	encoded[elen+1] = '\0';
 	return encoded;
@@ -313,6 +344,7 @@ unsigned char * encode64(unsigned char * string){
 // Returns decoded string if successful, NULL otherwise
 // Used by the command prompt thread to query the log
 unsigned char * decode64(unsigned char * string){
+	// calculate the length of the decoded string
 	int len = strlen((char *) string);
 	int dlen = len;
 	// if it was padded twice
@@ -323,8 +355,10 @@ unsigned char * decode64(unsigned char * string){
 	else if (string[len] == 61){
 		dlen -= 1;
 	}
+	// allocate
 	unsigned char * decoded = calloc(dlen,sizeof(unsigned char));
 	int plain = 0;
+	// decode
 	for (int enc = 0;enc < len;enc += 4){
 		if (dlen == len-1 && enc+4 == len){
 			int together = (((strchr(dict,string[enc])-dict) & 0x3f) << 18) | (((strchr(dict,string[enc+1])-dict) & 0x3f) << 12) | ((strchr(dict,string[enc+2])-dict) & 0x3f);

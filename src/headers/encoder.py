@@ -10,11 +10,14 @@ class Encoder:
 		self.ops = []
 		self.lens = []
 		self.opts = pattern.split(";")
+		# Make sure there are at least two encoding options
 		if (len(self.opts) != 2):
 			print("Error: Invalid Pattern Format")
 			raise ValueError("Invalid Pattern Format")
+		# Iterate across each option
 		for opt in self.opts:
 			opLen = opt.split(":")
+			# make sure its in the right general format
 			if (len(opLen) != 2):
 				print("Error: Invalid Option Format")
 				raise ValueError("Invalid Pattern Format")
@@ -119,6 +122,7 @@ class Encoder:
 			self.plain = self.plainBytes.decode()
 			return self.plain
 		except UnicodeDecodeError as err:
+			# Catch bit flip errors just in case it comes out unreadable
 			print(err)
 			return None
 
@@ -127,9 +131,11 @@ class Encoder:
 ## Returns True = pattern is valid
 def patternValidate(pattern):
 	opts = pattern.split(";")
+	# make sure there are at least two options
 	if (len(opts) < 2):
 		print("ERROR: Insufficient Encoding Options")
 		return False
+	# Validate each option using a regex
 	for opVal in opts:
 		if not re.match('(~|\^\d+|ror\d+|rol\d+):\d+',opVal):
 			print("ERROR: Invalid Encoding Option")

@@ -1,9 +1,5 @@
 # Source file for C2 Program written in Python3
-# TODO TEST WITH TCPHANDLER!!!
 import getopt, sys, os, re, logging, time
-# Keep scapy from throwing annoying warnings
-logging.getLogger("scapy.runtime").setLevel(logging.ERROR)
-from scapy.all import *
 file_loc = os.path.dirname(os.path.realpath(__file__)) # Find the directory this file is stored in
 headers_dir = "/".join(file_loc.split("/")[:-1])+"/src/headers"	# Location of the header file
 sys.path.append(headers_dir)
@@ -18,16 +14,10 @@ except ImportError as err:
 # Main function
 def main(opts,args):
 	print("Starting FTS C2 program...")
-	# Set scapy to work with the loopback address
-	conf.L3socket = L3RawSocket
 
 	# TODO FTS IP address
 	ftsAddr = "127.0.0.1"
 	# TODO FTS IP Address
-
-	# TODO local port to send traffic from
-	localPort = 65534
-	# TODO local port to send traffic from
 
 	file = None
 	path = None
@@ -40,7 +30,7 @@ def main(opts,args):
 
 	# Check to see if options were provided on the command line
 	if (len(opts) < 1):
-		# Run the prompt sequence
+		# Run the prompt sequence if they were not
 		global interactive
 		interactive  = True
 		global verbose
@@ -68,7 +58,7 @@ def main(opts,args):
 			sys.exit(0)
 
 		try:
-			destName = input("Name on the FSS: ").strip()
+			destName = input("Name on the FSS: ").strip().split('/')[-1:]
 		except KeyboardInterrupt:
 			print("\nBye!")
 			sys.exit(0)
@@ -92,31 +82,28 @@ def main(opts,args):
 				socket = val.strip()
 				if not socketValidate(socket):
 					sys.exit(1)
+			elif switch == "-s" or switch == "--store-as":
+				destName = val.strip().split('/')[-1:]
 
-		# If user didnt provide file through a switch, check args
-		if not file:
-			try:
-				file = args[0].strip()
-				if not handler.fileValidate(file):
-					sys.exit(1)
-			except IndexError as err:
-				print("ERROR parsing command line options: "+str(err))
-				sys.exit(1)
-
+	# Now that we have all our user input, break it into the parts we need and create the modules we need for the UDP initialization sequence
 	parts = socket.split(":")
 	addr = parts[0]
 	fssPort = parts[1]
 	udp = UDPHandler()
 
+	# Conduct the Initialization sequence
 	try:
 		while True:
+			# Request the transfer, within udpHandler this function sends 0x00, receives 0x03, and handles 0x04
 			response = requestTransfer(addr,fssPort,pattern,phrase,ftsAddr,localPort,destName,verbose)
 			if response != None:
 				break
 			elif not interactive:
+				# Close if run from the command line
 				print("Failed to initiate connection...\nExiting...\nBye!")
 				sys.exit(3)
 			else:
+				# Prompt to try again if run interactively
 				print("Failed to initiate connection...")
 				while True:
 					cont = input("Would you like to continue? [y/n]: ").strip()
@@ -130,6 +117,7 @@ def main(opts,args):
 						print("Please enter either \'y\' or \'n\'")
 						continue
 	except KeyboardInterrupt:
+		# Allow the user to force closure and gracefully exit
 		print("Bye!")
 		sys.exit(0)
 
@@ -166,42 +154,54 @@ def choose(pattern):
 	output=[]
 	try:
 		with open(file_loc+"/IPAddWhiteList") as f:
+			# Read the IPAddWhiteList file for all FSSs that match the encoding pattern
 			num = 1
 			for line in f:
 				parts=line.split(",")
 				if len(parts) != 3:
-					print("WARNING: IPAddWhiteList Entry Misformatted")
+					print("WARNING: IPAddWhiteList Entry Misformatted - "+line)
 					continue
+				# Check to see if this entry matches the encoding pattern for this session
 				if parts[2].rstrip() == pattern:
-					output.append("   "+str(num)+")\t"+parts[0]+":"+parts[1]+"\t"+parts[2]+"\n")
+					# Format the IPAddWhiteList entry to make it easier to read
+					output.append("   "+str(num)+")\t"+parts[0]+":"+parts[1]+"\n")
 					num += 1
 		print("")
 		for i in range(len(output)):
+			# Print the formatted output
 			print(output[i])
 
 	except FileNotFoundError:
+		# Catch a missing whitelist file and create it
 		f=open(file_loc+"/IPAddWhiteList","w")
 		f.close()
 
+	# Handle the case where no servers exist for that pattern
 	if len(output) == 0:
 		print("No valid FSS found for that encoding pattern, please manually enter a socket")
 		return enterSocket()
+	# Start the prompt sequence for choosing a socket from the whitelist
 	else:
 		try:
 			while True:
 				try:
 					choice = int(input("Choose a socket from one listed above my entering the number to the left, or enter 0 to submit a new socket: ").strip())
 					if choice >= 0 and choice <= len(output):
+						# Make sure the number actually corresponds to an entry
 						break
 				except ValueError:
+					# Catch a blank line or a non numeric choice
 					print("Please enter a number indicating which server you want to send your file to")
 					continue
 			if choice == "0":
+				# Allow manual entry
 				return enterSocket()
 			else:
+				# format and return the socket
 				entry = output[int(choice)-1].split("\t")[1] # extract the IP address and port
 				return entry
 		except KeyboardInterrupt:
+			# Allow forceful, graceful closure
 			print("Bye!")
 			sys.exit(0)
 
@@ -209,12 +209,14 @@ def choose(pattern):
 def enterSocket():
 	while True:
 		try:
+			# Accept user input
 			socket = input("Destination Socket: ").strip()
 		except KeyboardInterrupt:
+			# Allow forceful, graceful closure
 			print("\nBye!")
 			sys.exit(0)
-
 		if socketValidate(socket):
+			# make sure its a valid socket
 			break
 	return socket
 
@@ -222,7 +224,7 @@ def enterSocket():
 
 # Usage function to print switches and input
 def usage():
-	print("Usage: sudo python3 C2.py [-hv] -e '<encoding pattern>' -p <passphrase> -d <ip>:<port> [-f] <file>")
+	print("Usage: sudo python3 C2.py [-hv] -e '<encoding pattern>' -p <passphrase> -d <ip>:<port> -f <file> -s <file>")
 	return 0
 
 # Help function called by --help and -h
@@ -236,8 +238,9 @@ def help():
 	print("\t\t\t\t Each option contains two parts - an operation and a number of bytes to perform the operation on")
 	print("\t\t\t\t There are four options available - Bitwise XOR (^), Bitwise NOT (~), Rotate Right (ror), and Rotate Left (rol)")
 	print("\t -p <phrase>\t same as --passphrase, specifies the passphrase to be used to initialize the file transfer session")
-	print("\t -d <ip>:<port> /t same as --destination, specifies the IP Address and port of the FSS server to send to")
-	print("\t -f <filepath>\t optional, same as --file, specifies which file you want to transfer")
+	print("\t -d <ip>:<port> \t same as --destination, specifies the IP Address and port of the FSS server to send to")
+	print("\t -s <file name>\t same as --store-as, specifies the name of the file on the FSS")
+	print("\t -f <file path>\t same as --file, specifies which file you want to transfer")
 	print("\t -v \t\t optional, same as --verbose")
 	print("\t -h\t\t same as --help, displays this menu")
 	return 0
@@ -273,18 +276,21 @@ if __name__ == "__main__":
 
 	# Check for command line args and pass to main
 	try:
-		opts,args = getopt.getopt(sys.argv[1:],"vhe:p:f:d:",["help","encode=","passphrase=","file=","destination==","verbose"])
+		opts,args = getopt.getopt(sys.argv[1:],"vhe:p:f:d:s:",["help","encode=","passphrase=","file=","destination==","store-as=","verbose"])
 	except getopt.GetoptError as err:
+		# Catch switch errors
 		print(err)
 		usage()
 		sys.exit(1)
 
 	try:
+		# Check for -h switch
 		opt.index(('-h',''))
 		help()
 		sys.exit(0)
 	except ValueError:
 		try:
+			# check for --help switch
 			opts.index(('--help',''))
 			help()
 			sys.exit(0)
@@ -294,6 +300,7 @@ if __name__ == "__main__":
 		pass
 
 	try:
+		# Check for verbose switch
 		if opts.index(('-v','')):
 			verbose=True
 	except ValueError:

@@ -20,6 +20,7 @@ build: objects
 cleanAll: clean
 # Removes all object files and binaries
 	-rm -f bin/FTS
+	-rm -f $(TSTDIR)test
 
 clean:
 # Removes all object files

@@ -24,12 +24,17 @@ def main(opts):
 	verbose = False
 
 	for switch,val in opts:
+		# Iterate through the switches and assign values
 		if switch == "-e" or switch == "--encode":
 			if patternValidate(val):
 				pattern = val
 		elif switch == "-d" or switch == "--destination":
 			destination = val
-			if destination[-1:] != '/':
+			# Make sure provided destination is a directory and make sure its / terminated
+			if os.path.isdir():
+				print("Error: Destination must be a directory")
+				sys.exit(1)
+			elif destination[-1:] != '/':
 				destination += '/'
 		elif switch == "-p" or switch == "--port":
 			if int(val) > 65535 or int(val) < 1:
@@ -43,17 +48,20 @@ def main(opts):
 			usage()
 			sys.exit(1)
 
+	# If destination directory wasnt provided, set the default
 	if destination == None:
 		destination = "./"
 
+	# Catch any random errors
 	if pattern == None or port == None:
 		print("Error: Failed to assign values")
 		sys.exit(2)
 
+	# Create the encoder handler and UDP listener
 	encoder = Encoder(pattern)
-
 	sock = makeUDP(port,False);
 	if (sock == None):
+		# Catch socket crate errors
 		sys.exit(2)
 
 	try:
@@ -64,15 +72,17 @@ def main(opts):
 				try:
 					# Loop until we get a 0x01 packet
 					while True:
+						# Receive and unpack packets
 						pkt, (ftsAddr,ftsPort)  = sock.recvfrom(1450)
 						message,filename = udp.unpackInit(pkt)
 						if message != None and filename != None:
+							# Make sure unpackInit worked, ipsofacto that we received a 0x01 packet
 							if verbose:
 								print("Received message from {0}:{1} - {2} - {3}".format(ftsAddr,ftsPort,message,filename))
 							break
-				except KeyboardInterrupt: # Round-about way to keyboard interrupt the sniff
-					# CTRL+C will stop sniff but not throw the Interrupt into the main thread
-					# If you CTRL+C, then it will IndexError when trying to index into the packets that were sniffed
+				except KeyboardInterrupt:
+					# Allow forceful, graceful exit
+					sock.close();
 					print("\nBye!")
 					sys.exit(0)
 
@@ -86,16 +96,22 @@ def main(opts):
 				else:
 					break
 
-
+			# Start processing the message
 			decoded = encoder.decode(message)
 			if (decoded == None):
+				# Make sure decode succeeded
 				print("Error: Could not decode message")
 				sys.exit(2)
 			recoded = encoder.encode(decoded)
+			if recoded == None:
+				# catches an error with the encoding pattern that may not have been hit yet
+				print("Error: Could not encode message")
+				sys.exit(2)
 			if verbose:
 				print(message,"->",decoded,"->",recoded)
 
 			if message != recoded:
+				# Catch any errors in the decode/recode process
 				print("Error: Decode/Recode Failure")
 				sys.exit(2)
 
@@ -114,15 +130,14 @@ def main(opts):
 			if verbose:
 				print("Waiting for file...")
 
+			# Build the handler for the TCP transfer and start accepting connections
 			tcp = TCPHandler(ftsAddr,-1,pattern,verbose)
-			s,src = tcpSock.accept()
-			s.settimeout(1)
-
-			if (src[0] != ftsAddr):
-				print("WRONG SOURCE")
-				tcpSock.close()
-				s.close()
-				sys.exit(0)
+			while True:
+				s,src = tcpSock.accept()
+				s.settimeout(2)
+				if (src[0] == ftsAddr):
+					# Deny connections that arent from the FTS
+					break
 
 			# Receive the file
 			rcvd = tcp.recvFile(s,destination+filename)
@@ -167,16 +182,20 @@ if __name__ == "__main__":
 		sys.exit(0)
 	# grab options and pass to main
 	try:
+		# Capture the inputs
 		opts,args = getopt.getopt(sys.argv[1:],"e:p:hd:v",["help","encode=","port=","destination=","verbose"])
+		# Check for the -h switch, works with the ValueError catch below
 		opts.index(('-h',''))
 		help()
 		sys.exit(0)
 	except getopt.GetoptError as err:
+		# Catch switch errors
 		print(err)
 		usage()
 		sys.exit(1)
 	except ValueError:
 		try:
+			# Check for --help switch
 			opts.index(('--help',''))
 			help()
 			sys.exit(0)
@@ -184,14 +203,23 @@ if __name__ == "__main__":
 			pass
 
 	if len(opts) < 2:
+		# Make sure -p and -e are specified
 		print("Error: Not enough arguments")
 		usage()
 		sys.exit(1)
 
 	if len(args) > 0:
+		# Make sure there arent any extraneous inputs
 		print("Error: Unexpected Arguments")
 		usage()
 		sys.exit(1)
 
 	main(opts)
 	sys.exit(0)
+
+# Exit Codes
+## 0 - Success
+## 1 - Input Error
+## 2 - Internal Error
+## 3 - Could not complete initialization sequence (UDP)
+## 4 - TCP Error

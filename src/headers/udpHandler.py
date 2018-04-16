@@ -55,7 +55,7 @@ class UDPHandler:
 		# Convert an IP address from a string to a number that can be put into the packet
 		decimal = 0
 		numOct = 0
-		# Split the address into octets and reverse it in place (minimizes memory)
+		# Split the address into octets and reverse it in place
 		octets = addr.split(".")
 		if (len(octets) != 4):
 			print("ERROR: Unexpected IP Address format")
@@ -125,22 +125,29 @@ def makeUDP(port,timeout):
 ## Returns the validation packet (type 0x03) if the connection was successful, None otherwise
 def requestTransfer(addr,port,pattern,phrase,ftsAddr,localport,fname,verbose):
 	try:
+		# Make the socket and udp handler
 		sock = makeUDP(localport,True)
 		udp = UDPHandler()
+		# Build the request
 		pkt = udp.craftRequest(addr,port,pattern,phrase,fname)
-		for ftsPort in range(16000,16005):
+		# hit every port
+		for ftsPort in range(16000,17001):
 			if ftsPort%100 == 0 and not verbose and ftsPort != 16000:
 				print("Trying to connect . . . current port = ",ftsPort)
 			elif verbose:
 				print("Trying port ",ftsPort," . . . ")
+			# send the packet
 			sock.sendto(pkt,(ftsAddr,ftsPort))
 			try:
+				# receive packets
 				response,(respAddr,respPort) = sock.recvfrom(1450)
 			except socket.timeout:
 				continue
 			if ((respAddr != ftsAddr) or (respPort != ftsPort)):
+				# make sure the packet is from the FTS
 				continue
 			if response[0] == 0x04:
+				# catch 0x04 packets
 				print("ERROR: File already exists on FSS")
 				print("Enter a new file name below, or 'exit' to cancel")
 				try:
@@ -151,6 +158,7 @@ def requestTransfer(addr,port,pattern,phrase,ftsAddr,localport,fname,verbose):
 				except KeyboardInterrupt:
 					print("\nBye!")
 					sys.exit(0)
+				# rebuild the packet
 				pkt = udp.craftRequest(addr,port,pattern,phrase,name)
 				response = None
 				continue

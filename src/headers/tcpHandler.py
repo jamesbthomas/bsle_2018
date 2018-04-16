@@ -3,11 +3,11 @@ import re, random, os, time, socket
 from scapy.all import *
 from encoder import *
 from udpHandler import *
-# TODO TEST!!!!!
+
 class TCPHandler():
 
 	def __init__(self,dst,dport,pattern,verbose):
-		# Takes a destination address and port for all sent traffic
+		# Takes a destination address, port, and encoding pattern to use for all traffic
 		# Also takes a verbose argument to mark the session as verbose
 		self.verbose = verbose
 		if not addrValidate(dst):
@@ -60,8 +60,8 @@ class TCPHandler():
 		pkt = sock.recv(1450)
 		try:
 			while(pkt != b''):
+				# receive as long as packet contains stuff
 				total += len(pkt)
-				# print(self.enc.decode(pkt))
 				f.write(self.enc.decode(pkt))
 				pkt = sock.recv(1450)
 		except socket.timeout:
@@ -76,13 +76,17 @@ class TCPHandler():
 ## Returns true if valid, false if not
 ## Used by socketValidate in main
 def addrValidate(addr):
+	# Make sure its not a broadcast address
 	if addr == "0.0.0.0" or addr == "255.255.255.255":
 		print("Error: Invalid IP Address - will not send to all/broadcast")
 		return False
 	try:
 		octets = addr.split(".")
+		# Verify there are four octets
 		if len(octets) != 4:
-			raise AttributeError("Invalid Format")
+			print("Error: Invalid Format")
+			return False
+		# Make sure the octets are valid
 		for oct in octets:
 			if int(oct) > 255 or int(oct) < 0:
 				print("Error: Invalid IP Address")

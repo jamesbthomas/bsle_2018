@@ -54,6 +54,7 @@ int scrapeAddr(char * addr,unsigned char * pkt){
 			return 1;
 		}
 	}
+	// build the address out of the packet values
 	sprintf(addr,"%d.%d.%d.%d",pkt[1],pkt[2],pkt[3],pkt[4]);
 	if (strncmp(addr,"0.0.0.0",strlen(addr)) == 0 || strncmp(addr,"255.255.255.255",strlen(addr)) == 0){
 		// verify that the client isnt trying to send to a broadcast address
@@ -75,14 +76,19 @@ int scrapePort(unsigned char * pkt){
 // Scrapes the pattern length and validates the encoding pattern, storing it in parsed
 // Returns the length of the pattern on success, or -1 on error
 int scrapePattern(Pattern * parsed, unsigned char * pkt){
+	// pull out the length of the pattern
 	int len = pkt[7] << 8 | pkt[8];
+	// allocate space for the pattern and copy it from the packet
 	unsigned char * pattern = calloc(len+1,sizeof(unsigned char));
 	memcpy(pattern,pkt+9,len);
+	// convert it to a char * so that we can use it in patternValidate
 	char * cpattern = (char *) pattern;
+	// validate the pattern
 	if (patternValidate(cpattern,parsed) != 0){
 		free(pattern);
 		return -1;
 	}
+	// clean up and return
 	free(pattern);
 	return len;
 }
@@ -119,23 +125,30 @@ int scrapeMessage(unsigned char * message,unsigned char * pkt,int start,int size
 // Unpacks the Response and validates the input
 // Returns the TCP Port for the transfer on success, or -1 on error
 int unpackResponse(unsigned char * pkt,Pattern * parsed,unsigned char * message,unsigned char * decoded,int len){
+	// verify the packet type
 	if (pkt[0] != 0x02){
 		return -1;
 	}
+	// pull out the tcp port and validate
 	int port = pkt[2] | pkt[1] << 8;
 	if (port < 1 || port > 65535){
 		return -1;
 	}
+	// copy the response message out of the packet
 	unsigned char * responseMsg = calloc(len+1,sizeof(unsigned char));
 	memcpy(responseMsg,pkt+3,len);
+	// null terminate it
 	responseMsg[len] = '\0';
+	// decode the response message
 	unsigned char * dcoded = decode(responseMsg,parsed);
 	memcpy(decoded,dcoded,len);
 	free(dcoded);
+	// Compare the decoded message to the message we sent
 	if (memcmp(decoded,message,len) != 0){
 		free(responseMsg);
 		return -1;
 	}
+	// clean up and return
 	free(responseMsg);
 	return port;
 }

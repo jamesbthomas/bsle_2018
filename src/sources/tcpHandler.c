@@ -13,6 +13,7 @@
 // Function to make a TCP socket on the provided port
 // Returns the file descriptor for the socket, or -1 on error
 int makeTCPSocket(int port){
+	// verify the port
 	if (port < 1 || port > 65535){
 		return -1;
 	}
