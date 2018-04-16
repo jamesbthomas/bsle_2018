@@ -142,10 +142,8 @@ def patternValidate(pattern):
 			return False
 	return True
 
-# Used for dev testing
+# Used for dev testing and by the test.sh script
 if __name__ == "__main__":
-	enc = Encoder("ror1:40;rol1:120")
-	encoded = enc.encode("m")
-	print("encoded - ",encoded)
-	decoded = enc.decode(encoded)
-	print("decoded - ",decoded)
+	enc = Encoder("~:2;~:2")
+	with open("/etc/passwd","r") as file:
+		print(enc.encode(file.read()))

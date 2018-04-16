@@ -149,18 +149,18 @@ int main(int argc, char ** argv){
 			pthread_mutex_lock(&ready_lock);
 			ready = 0;
 			pthread_mutex_unlock(&ready_lock);
-			// Join all of the session threads
-			pthread_mutex_lock(&numthrd_lock);
-			printf("Joining remaining connections . . .\n");
-			for (int i = 1;i < TOTAL_SOCKETS+1;i++){
-				pthread_join(tids[i],NULL);
-			}
 			// Join the listener
 			printf("Joining Listener . . .\n");
 			pthread_join(tids[0],NULL);
 			// suuuuuper weird race condition on the join above, itll leak some of the memory allocated by the listener's pthread_create without a break
 			sleep(1);
 			pthread_mutex_unlock(&numthrd_lock);
+			// Join all of the session threads
+			pthread_mutex_lock(&numthrd_lock);
+			printf("Joining remaining connections . . .\n");
+			for (int i = 1;i < TOTAL_SOCKETS+1;i++){
+				pthread_join(tids[i],NULL);
+			}
 			printf(" . . . done!\nBye!\n");
 			// Free resources
 			free(tids);
@@ -346,7 +346,6 @@ void * transferSession(void * in){
 		// Not a valid FSS Address
 		free(s->packet);
 		free(s);
-		free(fssAddr);
 		threadClose(socketsIndex,sock,NULL);
 		pthread_detach(pthread_self());
 		// log it
@@ -358,6 +357,7 @@ void * transferSession(void * in){
 		char * cencEntry = (char *) encEntry;
 		fputs(cencEntry,log);
 		free(entry);
+		free(fssAddr);
 		free(encEntry);
 		fclose(log);
 		pthread_mutex_unlock(&log_lock);
@@ -367,7 +367,6 @@ void * transferSession(void * in){
         int fssUDPPort = scrapePort(s->packet);
         if (fssUDPPort == -1){
                 // Invalid port number
-		free(fssAddr);
 		free(s->packet);
 		free(s);
 		threadClose(socketsIndex,sock,NULL);
@@ -382,6 +381,7 @@ void * transferSession(void * in){
 		fputs(cencEntry,log);
 		free(entry);
 		free(encEntry);
+		free(fssAddr);
 		fclose(log);
 		pthread_mutex_unlock(&log_lock);
 		return NULL;
@@ -391,7 +391,6 @@ void * transferSession(void * in){
 	int patternLen = scrapePattern(parsed,s->packet);
         if (patternLen == -1){
                 // Invalid pattern
-		free(fssAddr);
 		free(s->packet);
 		free(s);
 		threadClose(socketsIndex,sock,parsed);
@@ -405,6 +404,7 @@ void * transferSession(void * in){
 		char * cencEntry = (char *) encEntry;
 		fputs(cencEntry,log);
 		free(entry);
+		free(fssAddr);
 		free(encEntry);
 		fclose(log);
 		pthread_mutex_unlock(&log_lock);
@@ -423,7 +423,6 @@ void * transferSession(void * in){
 	if (inet_aton(fssAddr,&(fss.sin_addr)) < 0){
 		// Failed to convert FSS Address
 		free(s);
-		free(fssAddr);
 		free(init);
 		free(message);
 		threadClose(socketsIndex,sock,parsed);
@@ -438,6 +437,7 @@ void * transferSession(void * in){
 		fputs(cencEntry,log);
 		free(entry);
 		free(encEntry);
+		free(fssAddr);
 		fclose(log);
 		pthread_mutex_unlock(&log_lock);
 		return NULL;
@@ -471,7 +471,6 @@ void * transferSession(void * in){
 	if (inet_aton(ctwoAddr,&(ctwo.sin_addr)) < 0){
 		// Failed to convert C2 address
 		free(decoded);
-		free(fssAddr);
 		threadClose(socketsIndex,sock,parsed);
 		pthread_detach(pthread_self());
 		// Log it
@@ -483,6 +482,7 @@ void * transferSession(void * in){
 		char * cencEntry = (char *) encEntry;
 		fputs(cencEntry,log);
 		free(entry);
+		free(fssAddr);
 		free(encEntry);
 		fclose(log);
 		pthread_mutex_unlock(&log_lock);
@@ -502,7 +502,6 @@ void * transferSession(void * in){
 				// Send the 0x04 packet to the C2
 				sendto(sock,response,1,0,(struct sockaddr *) &ctwo,sizeof(ctwo));
 				free(decoded);
-				free(fssAddr);
 				free(response);
 				free(message);
 				threadClose(socketsIndex,sock,parsed);
@@ -517,6 +516,7 @@ void * transferSession(void * in){
 				fputs(cencEntry,log);
 				free(entry);
 				free(encEntry);
+				free(fssAddr);
 				fclose(log);
 				pthread_mutex_unlock(&log_lock);
 				return NULL;
@@ -564,7 +564,6 @@ void * transferSession(void * in){
 	int ctwoListenSock = makeTCPSocket(tcpPort);
 	if (ctwoListenSock < 0){
 		// Socket create error
-		free(fssAddr);
 		free(validation);
 		close(ctwoListenSock);
 		threadClose(socketsIndex,sock,parsed);
@@ -577,6 +576,7 @@ void * transferSession(void * in){
 		unsigned char * encEntry = encode64((unsigned char *) entry);
 		char * cencEntry = (char *) encEntry;
 		fputs(cencEntry,log);
+		free(fssAddr);
 		free(entry);
 		free(encEntry);
 		fclose(log);
@@ -606,7 +606,6 @@ void * transferSession(void * in){
 	}
 	if (ctwoSock < 0){
 		// catch any random errors that might pop out of the accept call
-		free(fssAddr);
 		close(ctwoListenSock);
 		threadClose(socketsIndex,sock,parsed);
 		pthread_detach(pthread_self());
@@ -619,6 +618,7 @@ void * transferSession(void * in){
 		char * cencEntry = (char *) encEntry;
 		fputs(cencEntry,log);
 		free(entry);
+		free(fssAddr);
 		free(encEntry);
 		fclose(log);
 		pthread_mutex_unlock(&log_lock);
@@ -636,7 +636,6 @@ void * transferSession(void * in){
 		int res = fputs(data,temp);
 		if (res != 1){
 			// catch errors thrown by fputs
-			free(fssAddr);
 			free(data);
 			free(tmpfile);
 			fclose(temp);
@@ -652,6 +651,7 @@ void * transferSession(void * in){
 			char * cencEntry = (char *) encEntry;
 			fputs(cencEntry,log);
 			free(entry);
+			free(fssAddr);
 			free(encEntry);
 			fclose(log);
 			pthread_mutex_unlock(&log_lock);
@@ -671,7 +671,6 @@ void * transferSession(void * in){
 	fssTCP.sin_port = htons(fssTCPPort);
 	if (inet_aton(fssAddr,&(fssTCP.sin_addr)) < 0){
 		// Catch errors converting the fss TCP address
-		free(fssAddr);
 		free(tmpfile);
 		fclose(temp);
 		close(ctwoListenSock);
@@ -687,6 +686,7 @@ void * transferSession(void * in){
 		fputs(cencEntry,log);
 		free(entry);
 		free(encEntry);
+		free(fssAddr);
 		fclose(log);
 		pthread_mutex_unlock(&log_lock);
 		return NULL;

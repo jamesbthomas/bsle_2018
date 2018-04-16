@@ -23,34 +23,74 @@ def main(opts):
 	handler = FileHandler()
 	verbose = False
 
-	for switch,val in opts:
-		# Iterate through the switches and assign values
-		if switch == "-e" or switch == "--encode":
-			if patternValidate(val):
-				pattern = val
-		elif switch == "-d" or switch == "--destination":
-			destination = val
-			# Make sure provided destination is a directory and make sure its / terminated
-			if os.path.isdir():
-				print("Error: Destination must be a directory")
-				sys.exit(1)
-			elif destination[-1:] != '/':
-				destination += '/'
-		elif switch == "-p" or switch == "--port":
-			if int(val) > 65535 or int(val) < 1:
-				print("Error: Invalid Port Number")
-				sys.exit(1)
-			port = int(val)
-		elif switch == "-v" or switch == "--verbose":
-			verbose = True
-		else:
-			print("Error: Invalid Switch")
-			usage()
-			sys.exit(1)
+	if len(opts) < 1:
+		# request the encoding pattern
+		while True:
+			try:
+				pattern = input("Encoding Pattern: ").strip()
+				if patternValidate(pattern):
+					break
+			except KeyboardInterrupt:
+				print("\nBye!")
+				sys.exit(0)
+		# request the local port
+		while True:
+			try:
+				port = int(input("Local Port: ").strip())
+				if port > 0 and port < 65536:
+					break
+				else:
+					print("Error: Port must be between 1 and 65535")
+			except KeyboardInterrupt:
+				print("\nBye!")
+			except TypeError:
+				print("Error: Port must be a number")
+		# request the destination directory
+		while True:
+			try:
+				destination = input("Destination Directory [.]: ").strip()
+				if destination == '':
+					destination = "./"
+					break
+				if os.path.isdir(destination):
+					if destination[-1] != '/':
+						destination += '/'
+					break
+				else:
+					print("Error: Destination must be a directory")
+			except KeyboardInterrupt:
+				print("\nBye!")
+				sys.exit(0)
 
-	# If destination directory wasnt provided, set the default
-	if destination == None:
-		destination = "./"
+	else:
+		for switch,val in opts:
+			# Iterate through the switches and assign values
+			if switch == "-e" or switch == "--encode":
+				if patternValidate(val):
+					pattern = val
+			elif switch == "-d" or switch == "--destination":
+				destination = val
+				# Make sure provided destination is a directory and make sure its / terminated
+				if not os.path.isdir(destination):
+					print("Error: Destination must be a directory")
+					sys.exit(1)
+				elif destination[-1] != '/':
+					destination += '/'
+			elif switch == "-p" or switch == "--port":
+				if int(val) > 65535 or int(val) < 1:
+					print("Error: Invalid Port Number")
+					sys.exit(1)
+				port = int(val)
+			elif switch == "-v" or switch == "--verbose":
+				verbose = True
+			else:
+				print("Error: Invalid Switch")
+				usage()
+				sys.exit(1)
+
+		# If destination directory wasnt provided, set the default
+		if destination == None:
+			destination = "./"
 
 	# Catch any random errors
 	if pattern == None or port == None:
@@ -87,7 +127,7 @@ def main(opts):
 					sys.exit(0)
 
 				# Verify that the filename is available for this transfer
-				if handler.fileValidate(destination+filename):
+				if handler.fileValidate(destination+filename.decode("us-ascii")):
 					# Send packet type 0x04
 					if verbose:
 						print("File name exists - sending type 0x04")
@@ -140,7 +180,7 @@ def main(opts):
 					break
 
 			# Receive the file
-			rcvd = tcp.recvFile(s,destination+filename)
+			rcvd = tcp.recvFile(s,destination+filename.decode("us-ascii"))
 			if rcvd < 1:
 				print("Receive Failure")
 				tcpSock.close()
@@ -201,12 +241,6 @@ if __name__ == "__main__":
 			sys.exit(0)
 		except ValueError:
 			pass
-
-	if len(opts) < 2:
-		# Make sure -p and -e are specified
-		print("Error: Not enough arguments")
-		usage()
-		sys.exit(1)
 
 	if len(args) > 0:
 		# Make sure there arent any extraneous inputs

@@ -1,8 +1,7 @@
 # Python3 Source File for the UDPHandler class used to craft packets for the custom communication protocol and supporting functions
 # Assume all input validated before being passed to PacketCrafter
-from scapy.all import *
 from struct import *
-import socket
+import socket, sys
 from encoder import *
 
 class UDPHandler:
@@ -106,11 +105,13 @@ class UDPHandler:
 			return None
 		return tcpPort
 
-# Function to create a UDP socket on the provided port
+# Function to create a UDP socket on a random high port on or a specified port
 ## Return Value - the socket object on success, None otherwise
 def makeUDP(port,timeout):
 	try:
-		if (port > 65535 or port < 1):
+		if (port == None):
+			port = 0
+		if port < 0 or port > 65535:
 			return None
 		sock = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
 		sock.bind(('0.0.0.0',port))
@@ -123,10 +124,10 @@ def makeUDP(port,timeout):
 
 # Function to send the request packet to the FTS and receive the validation packet
 ## Returns the validation packet (type 0x03) if the connection was successful, None otherwise
-def requestTransfer(addr,port,pattern,phrase,ftsAddr,localport,fname,verbose):
+def requestTransfer(addr,port,pattern,phrase,ftsAddr,fname,verbose):
 	try:
 		# Make the socket and udp handler
-		sock = makeUDP(localport,True)
+		sock = makeUDP(None,True)
 		udp = UDPHandler()
 		# Build the request
 		pkt = udp.craftRequest(addr,port,pattern,phrase,fname)
@@ -169,7 +170,7 @@ def requestTransfer(addr,port,pattern,phrase,ftsAddr,localport,fname,verbose):
 				print("Timed out...")
 		return None
 	except Exception as err:
-		print(err+"\nBye!")
+		print(str(err)+"\nBye!")
 		sys.exit(2)
 
 # Used for dev testing

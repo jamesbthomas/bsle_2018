@@ -57,10 +57,10 @@ install:
 
 test: debug
 	gcc -o $(TSTDIR)test $(MODS) $(TSTDIR)test.o $(WARN) -lcunit
-	@echo "#####    PYTHON TESTS    #####"
+	@echo "#####      PYTHON  TESTS     #####"
 	-python3 $(TSTDIR)test.py
-	@echo "#####       C   TESTS    #####"
-	-valgrind $(TSTDIR)test
+	@echo "#####          C   TESTS     #####"
+	-$(TSTDIR)test
 	$(RMSRC)
 	$(RMHDR)
 	$(RMTST)

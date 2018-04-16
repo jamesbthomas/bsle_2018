@@ -11,7 +11,6 @@ class FileHandler:
 			f.close()
 			return True
 		except FileNotFoundError:
-			print("File not found")
 			return False
 
 	# Reads from the provided file path and returns the line containing the provided string or none if it does not exist

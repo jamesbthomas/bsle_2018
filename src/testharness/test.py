@@ -250,12 +250,14 @@ class MakeUDPTestCase(DefaultTestCase):
 
 	def runTest(self):
 		sock = makeUDP(1337,True)
-		self.assertNotEqual(sock,None)
+		self.assertEqual(sock.getsockname()[1],1337)
 		sock.close()
 		sock = makeUDP(1338,False)
+		self.assertEqual(sock.getsockname()[1],1338)
+		sock.close()
+		sock = makeUDP(0,False)
 		self.assertNotEqual(sock,None)
 		sock.close()
-		self.assertEqual(makeUDP(0,False),None)
 		self.assertEqual(makeUDP(65536,False),None)
 
 ## 	TCPHANDLER TESTS	##

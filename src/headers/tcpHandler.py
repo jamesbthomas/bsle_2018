@@ -1,6 +1,5 @@
 # Python3 Source File for the TCPHandler Class designed to handle sending and receiving TCP packets and associated functions to assist with handling packets
 import re, random, os, time, socket
-from scapy.all import *
 from encoder import *
 from udpHandler import *
 
@@ -13,7 +12,7 @@ class TCPHandler():
 		if not addrValidate(dst):
 			raise ValueError('Invalid IP Address')
 		self.dst = dst
-		if dport < 1 or dport > 65535:
+		if (dport < 1 or dport > 65535) and dport != -1:	# catch -1 so that this doesnt raise an exception when called by the FSS
 			raise ValueError('Invalid port number')
 		self.dport = dport
 		self.sport = None

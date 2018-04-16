@@ -35,6 +35,7 @@ def main(opts,args):
 		interactive  = True
 		global verbose
 		verbose = True
+		# Grab the path to the file to send
 		while True:
 			try:
 				file = input("Path to file: ").strip()
@@ -43,6 +44,7 @@ def main(opts,args):
 				sys.exit(0)
 			if handler.fileValidate(file):
 				break
+		# Grab the encoding pattern
 		while True:
 			try:
 				pattern = input("Encoding Pattern: ").strip()
@@ -51,18 +53,21 @@ def main(opts,args):
 				sys.exit(0)
 			if patternValidate(pattern):
 				break
+		# grab the pass phrase
 		try:
 			phrase = input("Passphrase: ").strip()
 		except KeyboardInterrupt:
 			print("\nBye!")
 			sys.exit(0)
 
+		# grab the destination file name
 		try:
-			destName = input("Name on the FSS: ").strip().split('/')[-1:]
+			destName = input("Name on the FSS: ").strip().split('/')[-1]
 		except KeyboardInterrupt:
 			print("\nBye!")
 			sys.exit(0)
 
+		# choose a destination fss
 		socket = choose(pattern)
 
 	else:
@@ -83,7 +88,7 @@ def main(opts,args):
 				if not socketValidate(socket):
 					sys.exit(1)
 			elif switch == "-s" or switch == "--store-as":
-				destName = val.strip().split('/')[-1:]
+				destName = val.strip().split('/')[-1]
 
 	# Now that we have all our user input, break it into the parts we need and create the modules we need for the UDP initialization sequence
 	parts = socket.split(":")
@@ -95,7 +100,7 @@ def main(opts,args):
 	try:
 		while True:
 			# Request the transfer, within udpHandler this function sends 0x00, receives 0x03, and handles 0x04
-			response = requestTransfer(addr,fssPort,pattern,phrase,ftsAddr,localPort,destName,verbose)
+			response = requestTransfer(addr,fssPort,pattern,phrase,ftsAddr,destName,verbose)
 			if response != None:
 				break
 			elif not interactive:
@@ -285,7 +290,7 @@ if __name__ == "__main__":
 
 	try:
 		# Check for -h switch
-		opt.index(('-h',''))
+		opts.index(('-h',''))
 		help()
 		sys.exit(0)
 	except ValueError:
