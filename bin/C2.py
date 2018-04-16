@@ -188,7 +188,14 @@ def choose(pattern):
 		return enterSocket()
 	else:
 		try:
-			choice = input("Choose a socket from one listed above my entering the number to the left, or enter 0 to submit a new socket: ").strip()
+			while True:
+				try:
+					choice = int(input("Choose a socket from one listed above my entering the number to the left, or enter 0 to submit a new socket: ").strip())
+					if choice >= 0 and choice <= len(output):
+						break
+				except ValueError:
+					print("Please enter a number indicating which server you want to send your file to")
+					continue
 			if choice == "0":
 				return enterSocket()
 			else:
