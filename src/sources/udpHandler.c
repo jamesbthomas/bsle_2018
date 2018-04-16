@@ -80,7 +80,6 @@ int scrapePattern(Pattern * parsed, unsigned char * pkt){
 	memcpy(pattern,pkt+9,len);
 	char * cpattern = (char *) pattern;
 	if (patternValidate(cpattern,parsed) != 0){
-		free(parsed);
 		free(pattern);
 		return -1;
 	}

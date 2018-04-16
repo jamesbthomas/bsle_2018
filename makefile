@@ -54,15 +54,14 @@ install:
 	sudo pip3 install scapy-python3
 	sudo apt-get install libcunit1 libcunit1-doc libcunit1-dev
 
-test: objects
+test: debug
 	gcc -o $(TSTDIR)test $(MODS) $(TSTDIR)test.o $(WARN) -lcunit
 	@echo "#####    PYTHON TESTS    #####"
 	-python3 $(TSTDIR)test.py
 	@echo "#####       C   TESTS    #####"
-	-$(TSTDIR)test
+	-valgrind $(TSTDIR)test
 	$(RMSRC)
 	$(RMHDR)
 	$(RMTST)
-	-rm -f src/testharness/test
 
 .PHONY: clean

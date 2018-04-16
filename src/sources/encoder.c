@@ -34,9 +34,9 @@ int patternValidate(char * pattern,Pattern * parsed){
 	parsed -> opts = calloc(parsed->maxOpts,sizeof(char *));
 	char * token = strtok(pattern,";");
 	while (token != NULL){
-		if (parsed->numOpts > parsed->maxOpts){
+		if (parsed->numOpts >= parsed->maxOpts){
 			parsed->maxOpts = parsed->maxOpts * 2;
-			parsed->opts = (char **) realloc(parsed->opts,parsed->maxOpts);
+			parsed->opts = (char **) realloc(parsed->opts,parsed->maxOpts*sizeof(char *));
 			if (parsed->opts == NULL){
 				printf("Error: Realloc Failure\n");
 				return 1;
@@ -62,69 +62,85 @@ int patternValidate(char * pattern,Pattern * parsed){
 		char * len = strtok(NULL,":");
 		if (len == NULL){
 			printf("Error: Invalid Length\n");
+			free(duppedOpts);
 			return 1;
 		}
 		int num = atoi(len);
 		if (num == 0 && strncmp(len,"0",1) != 0){
 			printf("Error: Invalid Length\n");
+			free(duppedOpts);
 			return 1;
 		}
 		parsed->lens[i] = num;
 		if (strtok(NULL,":") != NULL){
 			printf("Error: Invalid Option\n");
+			free(duppedOpts);
 			return 1;
 		}
 		if (strncmp(opVal,"^",1) == 0){
 			parsed->ops[i] = opVal[0];
 			if (strlen(opVal) < 2){
 				printf("Error: Invalid Operation\n");
+				free(duppedOpts);
 				return 1;
 			}
-			char * val = calloc(strlen(opVal)-1,sizeof(char));
+			char * val = calloc(strlen(opVal),sizeof(char));
 			for (int c = 1;c < strlen(opVal);c++){
 				if (isdigit(opVal[c]) == 0){
 					printf("Error: Invalid Value\n");
+					free(duppedOpts);
 					return 1;
 				}
 				val[c-1] = opVal[c];
 			}
+			val[strlen(opVal)-1] = '\0';
 			parsed->vals[i] = atoi(val)%8;
+			free(val);
 		}
 		else if (strncmp(opVal,"ror",3) == 0){
 			parsed->ops[i] = opVal[2];
 			if (strlen(opVal) < 4){
 				printf("Error: Invalid Operation\n");
+				free(duppedOpts);
 				return 1;
 			}
-			char * val = calloc(strlen(opVal)-3,sizeof(char));
+			char * val = calloc(strlen(opVal)-2,sizeof(char));
 			for (int c = 3;c < strlen(opVal);c++){
 				if (isdigit(opVal[c]) == 0){
 					printf("Error: Invalid Value\n");
+					free(duppedOpts);
 					return 1;
 				}
 				val[c-3] = opVal[c];
 			}
+			val[strlen(opVal)-3] = '\0';
 			parsed->vals[i] = atoi(val)%8;
+			free(val);
 		}
 		else if (strncmp(opVal,"rol",3) == 0){
 			parsed->ops[i] = opVal[2];
 			if (strlen(opVal) < 4){
 				printf("Error: Invalid Operation\n");
+				free(duppedOpts);
 				return 1;
 			}
-			char * val = calloc(strlen(opVal)-3,sizeof(char));
+			char * val = calloc(strlen(opVal)-2,sizeof(char));
 			for (int c = 3;c < strlen(opVal);c++){
 				if (isdigit(opVal[c]) == 0){
 					printf("Error: Invalid Value\n");
+					free(duppedOpts);
 					return 1;
 				}
 				val[c-3] = opVal[c];
 			}
+			val[strlen(opVal)-3] = '\0';
 			parsed->vals[i] = atoi(val)%8;
+			free(val);
 		}
 		else if (strncmp(opVal,"~",1) == 0){
 			if (strlen(opVal) != 1){
 				printf("Error: Invalid Operation\n");
+				free(duppedOpts);
 				return 1;
 			}
 			parsed->ops[i] = opVal[0];
@@ -132,6 +148,7 @@ int patternValidate(char * pattern,Pattern * parsed){
 		}
 		else{
 			printf("Error: Invalid Operation\n");
+			free(duppedOpts);
 			return 1;
 		}
 		free(duppedOpts);
@@ -187,6 +204,7 @@ unsigned char * encode(unsigned char * data,Pattern * parsed){
 			}
 			else{
 				printf("Error: Invalid Parsed Pattern\n");
+				free(encoded);
 				return NULL;
 			}
 			done += 1;

@@ -20,7 +20,7 @@
 #define MAX_SIZE 1450		// Maximum expected message size
 #define TIMEOUT 9000		// timeout for sockets
 #define MAX_CMD 100		// max size of a cmd prompt command
-#define MAX_LOG_ENTRY 256	// max size of a log entry
+#define MAX_LOG_ENTRY 512	// max size of a log entry
 
 void * transferSession(void * in);
 void * listener(void * in);
@@ -497,9 +497,7 @@ void * transferSession(void * in){
 	}
 	if (fails == 3){
 		// If the loop ended because it failed
-		printf("Error: Timeout waiting for response\n");
 		free(decoded);
-		free(fssAddr);
 		free(message);
 		free(response);
 		threadClose(socketsIndex,sock,parsed);
@@ -515,6 +513,7 @@ void * transferSession(void * in){
 		free(encEntry);
 		fclose(log);
 		pthread_mutex_unlock(&log_lock);
+		free(fssAddr);
 		return NULL;
 	}
 	free(response);
